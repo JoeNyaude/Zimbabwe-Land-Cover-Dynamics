@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Agriculture Prediction | ZIMLCD{% endblock %}
+{% block breadcrumb %}Agriculture Prediction{% endblock %}
+{% block heading %}Agriculture Land Cover Prediction{% endblock %}
+{% block nav_agriculture %}active{% endblock %}
+
+{% block content %}
+<style>
+  .agric-intro { max-width: 850px; color: #5d6a70; }
+  .agric-form { display:flex; flex-wrap:wrap; align-items:end; gap:12px; padding:16px; border:1px solid #c2c5bd; background:#f4f1e8; }
+  .agric-form label { display:flex; flex-direction:column; gap:5px; font-weight:bold; }
+  .agric-error { color:#8a392f; margin:12px 0; }
+  .agric-results { margin-top:22px; }
+  .agric-images { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .agric-images figure { margin:0; } .agric-images img { display:block; width:100%; border:1px solid #b3b7b5; }
+  .agric-images figcaption { margin:5px 0; font-weight:bold; }
+  .agric-legend { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:12px; }
+  .agric-legend span { display:flex; align-items:center; gap:6px; }
+  .agric-swatch { width:14px; height:14px; border:1px solid #777; display:inline-block; }
+</style>
+<p class="agric-intro">Upload a satellite image to classify each pixel with the trained Agric U-Net. Large images are processed in overlapping model-sized windows and predictions are stitched at the original image resolution. The color mask shows predicted land-cover classes; percentages summarize the classified image area.</p>
+<form class="agric-form" method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <label for="agric-image">Satellite image (PNG, JPEG or TIFF; up to 20 MB)</label>
+  <input id="agric-image" name="image" type="file" accept="image/png,image/jpeg,image/tiff" required>
+  <button type="submit">Generate prediction</button>
+</form>
+{% if error %}<p class="agric-error" role="alert">{{ error }}</p>{% endif %}
+{% if prediction_url %}
+<section class="agric-results" aria-label="Agriculture model prediction">
+  <div class="agric-images">
+    <figure><figcaption>Input image</figcaption><img src="{{ source_url }}" alt="Uploaded satellite image"></figure>
+    <figure><figcaption>Predicted land cover</figcaption><img src="{{ prediction_url }}" alt="U-Net land-cover segmentation mask"></figure>
+  </div>
+  <h2>Predicted area composition</h2>
+  <div class="agric-legend">{% for item in composition %}<span><i class="agric-swatch" style="background:{{ item.color }}"></i>{{ item.name }}: {{ item.percentage }}%</span>{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

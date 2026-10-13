@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}About ZIMLCD{% endblock %}
+{% block breadcrumb %}About{% endblock %}
+{% block heading %}About ZIMLCD{% endblock %}
+
+{% block content %}
+<p><strong>ZIMLCD</strong> is a research prototype for exploring land-cover patterns and image change across selected areas of Zimbabwe.</p>
+<h2>How it works</h2>
+<p>Dated Esri Wayback satellite images are fetched for the selected years and analyzed with the project's local CNN and change-detection models.</p>
+<ul>
+  <li><strong>Land cover:</strong> a scene-level class prediction for each complete snapshot.</li>
+  <li><strong>Change detection:</strong> a U-Net model's pixel-level change probability mask and the CNN's paired snapshot classes.</li>
+  <li><strong>Reports:</strong> a summary of the most recent analysis in the current session.</li>
+</ul>
+<p>The local models are not independently validated for Esri Wayback imagery. Treat their output as estimates and compare important results with trusted local reference data.</p>
+<p><a href="{% url 'help' %}">Read the usage guide</a> or <a href="{% url 'home' %}">open Change Analysis</a>.</p>
+{% endblock content %}

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}ZIMLCD Reports{% endblock %}
+{% block breadcrumb %}Reports{% endblock %}
+{% block heading %}Analysis Report{% endblock %}
+{% block nav_reports %}active{% endblock %}
+
+{% block content %}
+<style>
+  .report-note { padding:10px 12px; border-left:4px solid #4e6b3c; background:#eeece4; color:#34474f; font-size:12px; }
+  .report-table { width:100%; margin:14px 0; border-collapse:collapse; }
+  .report-table th,.report-table td { padding:9px 10px; border:1px solid #c2c5bd; text-align:left; vertical-align:top; }
+  .report-table th { width:34%; background:#eeece4; color:#34474f; }
+  .report-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:14px; }
+  .report-actions a { display:inline-block; padding:7px 10px; border:1px solid #8e9ca3; background:#d2dfe8; color:#173d5e; font-weight:bold; text-decoration:none; }
+  .report-actions a:hover { background:#bfd2df; }
+  .report-empty { padding:14px; border:1px solid #c2c5bd; background:#f4f1e8; }
+  .report-visuals { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin:22px 0; align-items:stretch; }
+  .report-chart { margin:0; padding:16px; border:1px solid #cbd5e1; border-top:3px solid #4b5563; border-radius:4px; background:#faf8f2; }
+  .report-chart h2 { margin:0 0 6px; color:#172554; font-size:19px; font-weight:700; }
+  .chart-caption { margin:0 0 16px; color:#475569; font-size:13px; line-height:1.5; }
+  .composition-bars { display:grid; gap:12px; margin:18px 0; }
+  .composition-row { display:grid; grid-template-columns:78px minmax(0,1fr); gap:10px; align-items:center; }
+  .composition-row strong { color:#334155; font-size:12px; }
+  .composition-track { display:flex; min-width:0; height:28px; overflow:hidden; border:1px solid #9ca3af; background:#e5e7eb; }
+  .composition-segment { display:block; height:100%; min-width:0; }
+
+  .composition-forest { background:#2a9d8f; }
+  .composition-urban { background:#6b7280; }
+
+  .composition-legend { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 14px; }
+  .composition-key-item { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#334155; font-size:11px; }
+  .composition-key-item span { display:flex; align-items:center; gap:6px; }
+  .composition-key-item strong { white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .composition-swatch { display:inline-block; width:11px; height:11px; flex:none; }
+  .composition-axis-row { margin-top:-9px; }
+  .composition-axis { display:flex; justify-content:space-between; color:#6b7280; font-size:10px; font-variant-numeric:tabular-nums; }
+  .chart-axis-note { margin:8px 0 0; color:#6b7280; font-size:11px; }
+  .histogram { height:190px; display:flex; gap:5px; padding:10px 4px 0; border-bottom:2px solid #64748b; }
+  .histogram-bin { flex:1; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; background:repeating-linear-gradient(to bottom,transparent 0,transparent 39px,#dbe4ef 40px); }
+  .histogram-bar { width:78%; min-height:3px; border-radius:4px 4px 0 0; background:linear-gradient(to top,#6d28d9,#a78bfa); }
+  .histogram-bin small { margin-top:5px; color:#334155; font-size:10px; font-weight:600; white-space:nowrap; }
+  .histogram-count { color:#1e293b; font-size:10px; font-weight:700; }
+  .time-series { display:block; width:100%; height:auto; min-height:220px; border-bottom:2px solid #64748b; border-radius:5px 5px 0 0; background:repeating-linear-gradient(to bottom,transparent 0,transparent 50px,#dbe4ef 51px); }
+  .time-series text { fill:#334155; font:12px Arial,sans-serif; }
+  .time-series polyline { fill:none; stroke:#2563eb; stroke-width:4; stroke-linecap:round; stroke-linejoin:round; }
+  .time-series circle { fill:#f97316; stroke:#fff; stroke-width:3; }
+  .time-series .year-grid { stroke:#cbd5e1; stroke-width:1.5; }
+  .change-chart { display:flex; align-items:center; justify-content:center; gap:24px; min-height:190px; }
+  .change-pie { display:block; width:170px; height:170px; flex:none; overflow:visible; filter:drop-shadow(0 4px 6px rgba(15,23,42,.2)); }
+  .change-pie .pie-unchanged { fill:#2a9d8f; }
+  .change-pie .pie-changed { fill:#e4572e; stroke:#fff; stroke-width:1.5; stroke-linejoin:round; }
+  .change-key { color:#334155; font-size:13px; line-height:1.9; }
+  .change-key strong { display:block; color:#172554; font-size:17px; }
+  .change-legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; color:#334155; font-size:12px; font-weight:600; }
+  .change-legend span { display:inline-flex; align-items:center; }
+  .change-legend i { display:inline-block; width:12px; height:12px; margin-right:5px; border-radius:2px; }
+  .change-legend .changed-swatch { background:#e4572e; }
+  .change-legend .unchanged-swatch { background:#2a9d8f; }
+  .report-table th,.report-table td { padding:12px 14px; }
+  /* High-contrast chart labels for the report's dark graph surfaces. */
+  .content-panel .report-chart { border-color:#cbd5e1 !important; border-top-color:#6b7280 !important; }
+  .content-panel .report-chart h2,.content-panel .report-chart .change-key strong { color:#f8fafc !important; }
+  .content-panel .report-chart .chart-caption,.content-panel .report-chart .change-key,.content-panel .report-chart .change-legend { color:#e2e8f0 !important; }
+  .content-panel .report-chart .histogram-bar { background:linear-gradient(to top,#6d28d9,#a78bfa) !important; }
+  .content-panel .report-chart .time-series polyline { stroke:#2563eb !important; }
+  .content-panel .report-chart .time-series circle { fill:#f97316 !important; stroke:#fff !important; }
+  .content-panel .report-chart .time-series text { fill:#e2e8f0 !important; }
+  .content-panel .report-chart .composition-row strong,.content-panel .report-chart .composition-key-item { color:#f1f5f9 !important; }
+  .content-panel .report-chart .composition-axis,.content-panel .report-chart .chart-axis-note { color:#d1d5db !important; }
+  .content-panel .report-chart .composition-track { border-color:#6b7280 !important; background:#1f2937 !important; }
+
+  .content-panel .report-chart .composition-forest { background:#2a9d8f !important; }
+  .content-panel .report-chart .composition-urban { background:#9ca3af !important; }
+
+  .content-panel .report-chart .change-pie .pie-unchanged { fill:#2a9d8f !important; }
+  .content-panel .report-chart .change-pie .pie-changed { fill:#e4572e !important; }
+  .content-panel .report-chart .change-legend .changed-swatch { background:#e4572e !important; }
+  .content-panel .report-chart .change-legend .unchanged-swatch { background:#2a9d8f !important; }
+  @media (max-width:700px) { .report-visuals { grid-template-columns:1fr; } }
+  @media (max-width:600px) { .report-visuals { gap:14px; } .report-chart { padding:14px; } .composition-row { grid-template-columns:64px minmax(0,1fr); gap:7px; } .composition-legend { grid-template-columns:1fr; } .histogram { height:160px; gap:2px; } .change-pie { width:140px; height:140px; } .change-chart { gap:14px; } }
+</style>
+
+{% if error %}<p class="report-note">{{ error }}</p>{% endif %}
+{% if analysis %}
+  <p class="report-note">This report reflects the latest analysis. Saved analyses can be reopened from the Dashboard in this browser.</p>
+  <section class="report-visuals" aria-label="Analysis charts">
+    <figure class="report-chart">
+      <h2>{% if analysis.outputs.classification_method == 'whole_snapshot_aspect_preserved' %}Whole-snapshot CNN class scores{% else %}Estimated land-cover composition{% endif %}</h2>
+      <figcaption class="chart-caption">{% if analysis.outputs.dynamic_world_enabled %}Annual Dynamic World pixel-class shares for the selected area at nominal 10 m resolution. This is the primary land-cover estimate.{% elif analysis.outputs.classification_method == 'whole_snapshot_aspect_preserved' %}Softmax scores from the scene classifier for each complete image. These are not calibrated probabilities or pixel-level land-cover shares.{% else %}Tile-weighted share assigned by the unvalidated local CNN. This is not a reliable pixel-level land-cover measurement.{% endif %}</figcaption>
+      {% if has_land_cover_composition %}
+      <div class="composition-bars">
+        <div class="composition-row"><strong>Earlier<br>{{ analysis.before_year }}</strong><div class="composition-track" role="img" aria-label="Earlier image class composition">{% for item in composition_classes %}<span class="composition-segment" style="width:{{ item.before }}%;background:{{ item.color }}" title="{{ item.name }} {{ item.before|floatformat:1 }}%"></span>{% endfor %}</div></div>
+        <div class="composition-row"><strong>Later<br>{{ analysis.after_year }}</strong><div class="composition-track" role="img" aria-label="Later image class composition">{% for item in composition_classes %}<span class="composition-segment" style="width:{{ item.after }}%;background:{{ item.color }}" title="{{ item.name }} {{ item.after|floatformat:1 }}%"></span>{% endfor %}</div></div>
+        <div class="composition-row composition-axis-row"><span></span><div class="composition-axis"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div></div>
+      </div>
+      <div class="composition-legend">{% for item in composition_classes %}<div class="composition-key-item"><span><i class="composition-swatch" style="background:{{ item.color }}"></i>{{ item.name }}</span><strong>{{ item.before|floatformat:1 }}% / {{ item.after|floatformat:1 }}%</strong></div>{% endfor %}</div>
+      {% else %}<p class="chart-caption">Class data is unavailable for this saved analysis. Run a new analysis to generate the CNN class scores.</p>{% endif %}
+    </figure>
+    <figure class="report-chart">
+      <h2>Detected change share</h2>
+      <figcaption class="chart-caption">{% if analysis.outputs.dynamic_world_enabled %}Share of classified Dynamic World pixels whose annual land-cover label changed.{% else %}Share of selected pixels flagged by the unvalidated Wayback change model.{% endif %}</figcaption>
+      <div class="change-chart">
+        <svg class="change-pie" id="change-share-pie" viewBox="0 0 180 180" data-changed="{{ change_percentage }}" role="img" aria-label="Pie chart: {{ change_percentage }} percent changed and {{ unchanged_percentage }} percent unchanged">
+          <title>{{ change_percentage|floatformat:1 }}% changed; {{ unchanged_percentage|floatformat:1 }}% unchanged</title>
+          <circle class="pie-unchanged" cx="90" cy="90" r="78"></circle>
+          <path class="pie-changed" id="change-share-slice" d=""></path>
+        </svg>
+        <div class="change-key"><strong>{{ change_percentage|floatformat:1 }}%</strong>flagged changed<br><strong>{{ analysis.changed_hectares|floatformat:2 }} ha</strong>estimated changed area<br><strong>{{ analysis.area_hectares|floatformat:2 }} ha</strong>total selected area<div class="change-legend"><span><i class="changed-swatch"></i>Changed</span><span><i class="unchanged-swatch"></i>Unchanged</span></div></div>
+      </div>
+    </figure>
+    <figure class="report-chart">
+      <h2>Supplementary model score distribution</h2><figcaption class="chart-caption">{% if score_bin_source == 'Wayback U-Net change probabilities' %}Per-pixel Wayback U-Net change scores from the supplementary prediction, grouped into ten percentage bins. Taller bars mean more pixels fell in that range.{% else %}Recorded class scores from this older analysis, grouped into ten percentage bins.{% endif %}</figcaption>
+      <div class="histogram" role="img" aria-label="Histogram of model scores grouped into ten percentage ranges">
+        {% for bin in score_bins %}<div class="histogram-bin" title="{{ bin.label }}: {{ bin.count }} pixels"><span class="histogram-count">{{ bin.count }}</span><span class="histogram-bar" style="height:{% widthratio bin.count score_bin_max 100 %}%"></span><small>{{ bin.label }}</small></div>{% endfor %}
+      </div>
+      <p class="chart-axis-note">Y-axis: pixel count. X-axis: {{ score_bin_source }} by score range.</p>
+      <p class="chart-caption">Showing {{ score_bin_source }} for this analysis. This output does not determine the primary Dynamic World land-cover or change result.</p>
+    </figure>
+    <figure class="report-chart">
+      <h2>Change over time</h2><figcaption class="chart-caption">{% if analysis.outputs.dynamic_world_enabled %}Dynamic World annual class-change share by later year. Points are shown for available saved comparisons; line segments connect consecutive years only.{% else %}Changed-pixel share by later image year, from the unvalidated Wayback change model.{% endif %}</figcaption>
+      {% if time_series %}<svg class="time-series" viewBox="0 0 500 180" role="img" aria-label="Time series of changed pixel share across saved analyses">
+        <text x="3" y="24">100%</text><text x="12" y="88">50%</text><text x="25" y="153">0%</text>
+        {% for year in timeline_years %}<line class="year-grid" x1="{{ year.x }}" y1="20" x2="{{ year.x }}" y2="150" /><text x="{{ year.x }}" y="171" text-anchor="middle">{{ year.year }}</text>{% endfor %}
+        {% for segment in time_series_segments %}<polyline points="{{ segment }}" />{% endfor %}
+        {% for point in time_series %}<circle cx="{{ point.x }}" cy="{{ point.y }}" r="4"><title>{{ point.year }}: {{ point.changed|floatformat:1 }}% changed, {{ point.label }}</title></circle>{% endfor %}
+      </svg><p class="chart-axis-note">Y-axis: pixels flagged as changed (%). X-axis: later image year.{% if not time_series_segments %} Add analyses for consecutive years to draw a trend line.{% endif %}</p>{% else %}<p>No dated analyses are available to plot yet.</p>{% endif %}
+    </figure>
+  </section>
+  <table class="report-table">
+    <tbody>
+      <tr><th>Analysis identifier</th><td>{{ analysis.analysis_id }}</td></tr>
+      <tr><th>Location name</th><td>{{ analysis.location_name|default:'Unnamed area' }}</td></tr>
+      <tr><th>Earlier imagery</th><td>{{ analysis.before_year }} &middot; Wayback release {{ analysis.outputs.before_release_date }}</td></tr>
+      {% if analysis.outputs.dynamic_world_enabled %}<tr><th>Earlier Dynamic World dominant class</th><td>{{ analysis.outputs.dynamic_world_before_dominant_class|default:'No classified pixels' }}</td></tr>{% else %}<tr><th>Earlier unvalidated CNN estimate</th><td>{{ analysis.outputs.before_predicted_class }}</td></tr>{% endif %}
+      {% if has_land_cover_composition %}<tr><th>Earlier land-cover composition</th><td>{% for item in composition_classes %}{{ item.name }} {{ item.before|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</td></tr>{% endif %}
+      <tr><th>Later imagery</th><td>{{ analysis.after_year }} &middot; Wayback release {{ analysis.outputs.after_release_date }}</td></tr>
+      {% if analysis.outputs.dynamic_world_enabled %}<tr><th>Later Dynamic World dominant class</th><td>{{ analysis.outputs.dynamic_world_after_dominant_class|default:'No classified pixels' }}</td></tr>{% else %}<tr><th>Later unvalidated CNN estimate</th><td>{{ analysis.outputs.after_predicted_class }}</td></tr>{% endif %}
+      {% if has_land_cover_composition %}<tr><th>Later land-cover composition</th><td>{% for item in composition_classes %}{{ item.name }} {{ item.after|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</td></tr>{% endif %}
+      <tr><th>{% if analysis.outputs.dynamic_world_enabled %}Dynamic World pixels with annual class change{% else %}Pixels flagged changed by unvalidated Wayback model{% endif %}</th><td>{{ analysis.outputs.changed_percentage }}%</td></tr>
+      {% if analysis.outputs.dynamic_world_forest_loss %}<tr><th>Potential forest loss</th><td>{{ analysis.outputs.dynamic_world_forest_loss.percentage }}% ({{ analysis.outputs.dynamic_world_forest_loss.area_km2 }} km²). Candidate transition, not confirmed deforestation.</td></tr>{% endif %}
+      <tr><th>Selected area (estimated)</th><td>{{ analysis.area_hectares|floatformat:2 }} hectares</td></tr>
+      <tr><th>{% if analysis.outputs.dynamic_world_enabled %}Dynamic World changed area (estimated){% else %}Changed area (estimated){% endif %}</th><td>{{ analysis.changed_hectares|floatformat:2 }} hectares</td></tr>
+      <tr><th>Selected bounds</th><td>South {{ analysis.bounds.south }}, West {{ analysis.bounds.west }}<br>North {{ analysis.bounds.north }}, East {{ analysis.bounds.east }}</td></tr>
+      <tr><th>Map location</th><td><a href="{{ analysis_map_url }}" target="_blank" rel="noopener">Open selected-area centre on OpenStreetMap</a></td></tr>
+      <tr><th>Primary data source</th><td>{% if analysis.outputs.dynamic_world_enabled %}Google Dynamic World annual Sentinel-2 classifications; nominal 10 m{% else %}Unvalidated four-class local CNN and change U-Net{% endif %}</td></tr>
+      <tr><th>Interpretation</th><td>Area and land-cover values are model estimates from Esri Wayback imagery, not independently verified measurements. Validate important results against trusted local reference data.</td></tr>
+    </tbody>
+  </table>
+  <div class="report-actions">
+    <a href="{% url 'download-report' %}">Download CSV report</a>
+    <a href="{% url 'analysis-results' %}">View image results</a>
+  </div>
+  <script>
+    (() => {
+      const pie = document.getElementById('change-share-pie');
+      const slice = document.getElementById('change-share-slice');
+      if (!pie || !slice) return;
+      const changed = Math.max(0, Math.min(100, Number(pie.dataset.changed) || 0));
+      if (changed >= 100) {
+        slice.setAttribute('d', 'M90 90 m-78 0 a78 78 0 1 0 156 0 a78 78 0 1 0 -156 0');
+        return;
+      }
+      if (changed <= 0) return;
+      const angle = changed * 3.6;
+      const endRadians = (angle - 90) * Math.PI / 180;
+      const endX = 90 + 78 * Math.cos(endRadians);
+      const endY = 90 + 78 * Math.sin(endRadians);
+      const largeArc = angle > 180 ? 1 : 0;
+      slice.setAttribute('d', `M90 90 L90 12 A78 78 0 ${largeArc} 1 ${endX} ${endY} Z`);
+    })();
+  </script>
+{% else %}
+  <div class="report-empty"><p>No analysis report is available yet.</p><p>Choose an area and run a change analysis to create a report.</p><a href="{% url 'home' %}">Go to Change Analysis</a></div>
+{% endif %}
+{% endblock content %}

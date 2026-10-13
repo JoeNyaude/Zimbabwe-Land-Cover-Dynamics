@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}ZIMLCD Analysis Results{% endblock %}
+{% block breadcrumb %}Analysis Results{% endblock %}
+{% block heading %}Analysis Results{% endblock %}
+{% block nav_results %}active{% endblock %}
+
+{% block content %}
+<style>
+  .results-page { color:#1f2c33; }
+  .results-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0; }
+  .summary-item,.result-card { min-width:0; padding:12px; border:1px solid #c2c5bd; background:#f4f1e8; }
+  .summary-label { display:block; margin-bottom:3px; color:#5d6a70; font-size:10px; font-weight:bold; text-transform:uppercase; }
+  .summary-value { color:#1f3c4b; font-family:'Times New Roman',Times,serif; font-size:17px; }
+  .results-section { margin-top:20px; }
+  .section-heading { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin:0 0 9px; }
+  .section-heading h2 { color:#1f3c4b; font-size:20px; }
+  .section-heading p { margin:0; color:#5d6a70; font-size:11px; }
+  .model-results { display:grid; grid-template-columns:repeat(5,minmax(170px,1fr)); gap:0; overflow-x:auto; padding-bottom:5px; }
+  .model-card { margin:0; padding:0; border-right:0; }
+  .model-card h3 { min-height:34px; margin:0; padding:6px 8px; color:#1f3c4b; font-family:'Times New Roman',Times,serif; font-size:16px; font-weight:normal; }
+  .model-card img { display:block; width:100%; height:220px; object-fit:contain; border:1px solid #aeb5b5; background:#182b34; }
+  .mask-threshold-form { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:10px 0; padding:10px; border:1px solid #c2c5bd; background:#eeece4; }
+  .mask-threshold-form label { display:flex; align-items:center; gap:8px; color:#34474f; font-size:12px; font-weight:bold; }
+  .mask-threshold-form input[type="range"] { width:190px; }
+  .mask-threshold-form button { min-height:30px; padding:5px 9px; border:1px solid #8e9ca3; border-radius:0; background:#d2dfe8; color:#173d5e; cursor:pointer; font:inherit; font-weight:bold; }
+  .mask-empty-note { margin:8px 0; padding:8px 10px; border-left:3px solid #b17b2e; background:#f3ead5; color:#604b29; font-size:11px; }
+  .model-card figcaption { margin:0; padding:6px 8px; color:#5d6a70; font-size:11px; }
+  .map-card { padding:10px; }
+  #result-map { width:100%; height:360px; border:1px solid #8e9ca3; }
+  #dynamic-world-map { width:100%; height:420px; border:1px solid #8e9ca3; }
+  .dynamic-world-layers { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+  .dynamic-world-layer { padding:6px 9px; border:1px solid #8e9ca3; background:#eef2f2; color:#173d5e; font:inherit; cursor:pointer; }
+  .dynamic-world-layer[aria-pressed="true"] { background:#1c4e70; color:#fff; }
+  .class-result { display:grid; grid-template-columns:minmax(180px,.75fr) minmax(0,1.25fr); align-items:center; gap:14px; }
+  .class-result img { display:block; width:100%; max-height:360px; object-fit:contain; border:1px solid #aeb5b5; background:#e5e2d9; }
+  .class-result h3 { margin:0 0 8px; color:#1f3c4b; font-size:19px; }
+  .class-result p { color:#5d6a70; font-size:12px; }
+  .agric-predictions { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+  .agric-prediction-card { padding:12px; border:1px solid #c2c5bd; background:#f4f1e8; }
+  .agric-prediction-card h3 { margin:0 0 8px; }
+  .agric-prediction-card img { display:block; width:100%; max-height:360px; object-fit:contain; border:1px solid #aeb5b5; background:#182b34; }
+  .agric-composition { margin:8px 0 0; color:#34474f; font-size:12px; }
+  .agric-legend { display:flex; flex-wrap:wrap; gap:8px 18px; margin:0 0 12px; padding:10px 12px; border:1px solid #c2c5bd; background:#f4f1e8; }
+  .agric-legend-item { display:inline-flex; align-items:center; gap:7px; color:#34474f; font-size:12px; }
+  .agric-legend-swatch { width:15px; height:15px; display:inline-block; border:1px solid #68747a; }
+  /* The shared dark theme force-colors text inside content panels; keep text
+     dark on these intentionally light legend and prediction surfaces. */
+  .content-panel #agric-predictions .agric-legend,
+  .content-panel #agric-predictions .agric-prediction-card { background:#f4f1e8 !important; }
+  .content-panel #agric-predictions .agric-legend-item,
+  .content-panel #agric-predictions .agric-prediction-card h3,
+  .content-panel #agric-predictions .agric-composition,
+  .content-panel #agric-predictions .agric-composition strong,
+  .content-panel #agric-predictions .local-transition-note { color:#263940 !important; }
+  .class-review { margin-top:14px; padding:12px; border:1px solid #c2c5bd; background:#eeece4; }
+  .class-review h3 { margin:0 0 8px; color:#1f3c4b; font-size:17px; }
+  .class-review form { display:flex; align-items:end; flex-wrap:wrap; gap:10px; }
+  .class-review label { display:flex; flex-direction:column; gap:4px; color:#34474f; font-size:11px; font-weight:bold; }
+  .class-review select,.class-review button { min-height:32px; padding:5px 8px; border:1px solid #8e9ca3; border-radius:0; background:#fff; color:#263940; font:inherit; }
+  .class-review button { background:#d2dfe8; color:#173d5e; cursor:pointer; font-weight:bold; }
+  .review-notice { padding:9px; border-left:4px solid #4e6b3c; background:#e9eee3; color:#344b30; font-size:12px; }
+  .location-form { display:flex; align-items:end; flex-wrap:wrap; gap:9px; margin:10px 0; padding:10px; border:1px solid #c2c5bd; background:#eeece4; }
+  .location-form label { display:flex; flex-direction:column; gap:4px; color:#34474f; font-size:11px; font-weight:bold; }
+  .location-form input,.location-form button { min-height:32px; padding:5px 8px; border:1px solid #8e9ca3; border-radius:0; background:#fff; color:#263940; font:inherit; }
+  .location-form input { width:min(320px,70vw); }
+  .location-form button { background:#d2dfe8; color:#173d5e; cursor:pointer; font-weight:bold; }
+  .result-warning { margin:0 0 16px; padding:10px 12px; border-left:4px solid #b17b2e; background:#f3ead5; color:#604b29; font-size:12px; }
+  .result-warning-typing::after { content:"|"; animation:result-caret 0.7s steps(1) infinite; }
+  @keyframes result-caret { 50% { opacity:0; } }
+  .result-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .results-error { padding:12px; border:1px solid #c2c5bd; background:#f4f1e8; }
+  .local-transition-summary { display:flex; flex-wrap:wrap; gap:8px 20px; margin:10px 0; }
+  .local-transition-summary strong { color:#1f3c4b; font-size:15px; }
+  .local-transition-table { width:100%; border-collapse:collapse; margin:12px 0; }
+  .local-transition-table th,.local-transition-table td { padding:8px; border:1px solid #c2c5bd; text-align:left; }
+  .local-transition-table th { background:#eeece4; }
+  .local-transition-note { color:#5d6a70; font-size:11px; }
+  .forest-loss-map-note { margin:8px 0 0; color:#5d6a70; font-size:11px; }
+  .forest-loss-map-note.error { color:#8a392f; }
+  .results-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:16px; }
+  .back-link { color:#1c4e70; font-size:12px; }
+  .results-footnote { color:#5d6a70; font-size:11px; }
+  @media(max-width:700px) { .model-results { grid-template-columns:repeat(5,minmax(170px,1fr)); } .class-result { grid-template-columns:1fr; } #result-map { height:320px; } .results-actions { align-items:flex-start; flex-direction:column; } }
+</style>
+
+<div class="results-page">
+{% if error %}
+  <p class="results-error">{{ error }}</p>
+  <a class="back-link" href="{% url 'home' %}">Return to Change Analysis</a>
+{% else %}
+  <p>{% if analysis.outputs.dynamic_world_enabled %}Annual Dynamic World land-cover results and supplementary Wayback imagery for <strong>{{ analysis.location_name|default:'Unnamed area' }}</strong>, comparing {{ analysis.before_year }} and {{ analysis.after_year }}.{% else %}Model results for <strong>{{ analysis.location_name|default:'Unnamed area' }}</strong>, comparing {{ analysis.before_year }} and {{ analysis.after_year }} imagery.{% endif %}</p>
+  {% if location_notice %}<p class="review-notice">{{ location_notice }}</p>{% endif %}
+  <form class="location-form" method="post" action="{% url 'update-analysis-location' %}">
+    {% csrf_token %}
+    <input type="hidden" name="analysis_id" value="{{ analysis.analysis_id }}">
+    <label for="analysis-location-name">Location name
+      <input id="analysis-location-name" name="location_name" type="text" maxlength="120" value="{{ analysis.location_name }}" placeholder="e.g. Makoni, Chitungwiza">
+    </label>
+    <button type="submit">Save location name</button>
+  </form>
+
+  <div class="results-summary">
+    <div class="summary-item"><span class="summary-label">Earlier snapshot</span><span class="summary-value">{{ analysis.before_year }}</span></div>
+    <div class="summary-item"><span class="summary-label">Later snapshot</span><span class="summary-value">{{ analysis.after_year }}</span></div>
+    <div class="summary-item"><span class="summary-label">{% if analysis.outputs.dynamic_world_enabled %}Earlier Dynamic World dominant class{% elif analysis.outputs.agric_before_dominant_class %}Earlier Best U-Net estimate{% else %}Earlier CNN estimate{% endif %}</span><span class="summary-value">{% if analysis.outputs.dynamic_world_enabled %}{{ analysis.outputs.dynamic_world_before_dominant_class|default:'No classified pixels' }}{% elif analysis.outputs.agric_before_dominant_class %}{{ analysis.outputs.agric_before_dominant_class }}{% else %}{{ analysis.outputs.before_predicted_class }}{% endif %}</span></div>
+    <div class="summary-item"><span class="summary-label">{% if analysis.outputs.dynamic_world_enabled %}Later Dynamic World dominant class{% elif analysis.outputs.agric_after_dominant_class %}Later Best U-Net estimate{% else %}Later CNN estimate{% endif %}</span><span class="summary-value">{% if analysis.outputs.dynamic_world_enabled %}{{ analysis.outputs.dynamic_world_after_dominant_class|default:'No classified pixels' }}{% elif analysis.outputs.agric_after_dominant_class %}{{ analysis.outputs.agric_after_dominant_class }}{% else %}{{ analysis.outputs.after_predicted_class }}{% endif %}</span></div>
+    <div class="summary-item"><span class="summary-label">{% if analysis.outputs.dynamic_world_enabled %}Dynamic World pixels with class change{% else %}Pixels flagged by unvalidated Wayback change model{% endif %}</span><span class="summary-value">{{ analysis.outputs.changed_percentage }}%</span></div>
+    <div class="summary-item"><span class="summary-label">Analyzed area (estimated)</span><span class="summary-value">{{ analysis.area_hectares|floatformat:2 }} ha</span></div>
+    <div class="summary-item"><span class="summary-label">Changed area (estimated)</span><span class="summary-value">{{ analysis.changed_hectares|floatformat:2 }} ha</span></div>
+  </div>
+
+  <section class="results-section local-transition-section">
+    {% if analysis.outputs.dynamic_world_enabled %}
+      <div class="section-heading"><h2>Primary land-cover transitions (Dynamic World)</h2><p>{{ analysis.before_year }} to {{ analysis.after_year }} · annual 10 m labels</p></div>
+      <div class="local-transition-summary">
+        <span>Dynamic World dominant class: <strong>{{ analysis.outputs.dynamic_world_before_dominant_class }} &rarr; {{ analysis.outputs.dynamic_world_after_dominant_class }}</strong></span>
+        <span>Classified pixels changing class: <strong>{{ analysis.outputs.dynamic_world_changed_percentage|floatformat:2 }}%</strong></span>
+      </div>
+      {% with forest_loss=analysis.outputs.dynamic_world_forest_loss %}
+      <div class="local-transition-summary">
+        <span>Potential forest loss (Forest/Trees → any other class): <strong>{{ forest_loss.percentage|floatformat:2 }}%</strong></span>
+        <span>Estimated area: <strong>{{ forest_loss.area_km2|floatformat:3 }} km²</strong></span>
+      </div>
+      <p class="local-transition-note">{{ forest_loss.interpretation }} Dynamic World reports annual class labels, not a specific cause; harvest, fire, seasonal effects, and classification errors can also produce a forest-to-nonforest transition.</p>
+      {% endwith %}
+      <table class="local-transition-table"><thead><tr><th>From class</th><th>To class</th><th>Share of classified area</th><th>Area (km²)</th></tr></thead><tbody>
+        {% for transition in analysis.outputs.dynamic_world_transitions %}<tr><td>{{ transition.from_class }}</td><td>{{ transition.to_class }}</td><td>{{ transition.percentage|floatformat:2 }}%</td><td>{{ transition.area_km2|floatformat:3 }}</td></tr>{% empty %}<tr><td colspan="4">No annual class transitions were found.</td></tr>{% endfor %}
+      </tbody></table>
+      <p class="local-transition-note">Dynamic World classifications are generated from Sentinel-2 observations and are independent of the Esri Wayback snapshots shown below. They use annual per-pixel mode labels at nominal 10 m resolution; the latest year may be incomplete.</p>
+    {% elif analysis.outputs.local_class_transitions %}
+      <div class="section-heading"><h2>Local land-cover transitions</h2><p>{{ analysis.before_year }} to {{ analysis.after_year }} · supplementary local CNN estimate</p></div>
+      {% with local_transitions=analysis.outputs.local_class_transitions %}
+      {% if local_transitions.method == 'paired_snapshot_cnn_classes' %}
+      <div class="local-transition-summary"><span>Paired snapshot predictions with different classes: <strong>{{ local_transitions.changed_percentage|floatformat:1 }}%</strong></span><span>Compared snapshots: <strong>{{ local_transitions.snapshot_count }}</strong></span></div>
+      <table class="local-transition-table"><thead><tr><th>Earlier snapshot class</th><th>Later snapshot class</th><th>Comparisons</th></tr></thead><tbody>
+        {% for transition in local_transitions.transitions %}<tr><td>{{ transition.from_class }}</td><td>{{ transition.to_class }}</td><td>{{ transition.snapshot_count }}</td></tr>{% empty %}<tr><td colspan="3">The paired snapshots received the same predicted class.</td></tr>{% endfor %}
+      </tbody></table>
+      <p class="local-transition-note">The CNN classifies each complete snapshot as a scene; this is not a pixel-level transition map.</p>
+      {% else %}
+      <div class="local-transition-summary"><span>Classified tile area changing class: <strong>{{ local_transitions.changed_percentage|floatformat:1 }}%</strong></span><span>Matched tiles: <strong>{{ local_transitions.tile_count }}</strong></span></div>
+      <table class="local-transition-table"><thead><tr><th>From class</th><th>To class</th><th>Share of snapshot area</th><th>Tiles</th></tr></thead><tbody>
+        {% for transition in local_transitions.transitions %}<tr><td>{{ transition.from_class }}</td><td>{{ transition.to_class }}</td><td>{{ transition.percentage|floatformat:2 }}%</td><td>{{ transition.tile_count }}</td></tr>{% empty %}<tr><td colspan="4">No class transitions were predicted between the paired tiles.</td></tr>{% endfor %}
+      </tbody></table>
+      {% endif %}
+      {% if local_transitions.method == 'paired_snapshot_cnn_classes' %}
+        <p class="local-transition-note">The CNN was trained on a separate image dataset and is not validated for these Wayback snapshots.</p>
+      {% else %}
+        <p class="local-transition-note">The local CNN was trained on a separate image dataset and is not validated for these Wayback snapshots. Its tile estimates should not be treated as a reliable land-cover map.</p>
+      {% endif %}
+      {% endwith %}
+    {% else %}
+      <p>Transition data is unavailable for this saved analysis. Run a new analysis to calculate paired snapshot class predictions with the local CNN.</p>
+    {% endif %}
+  </section>
+
+  <p class="result-warning" aria-live="off"><span class="result-warning-typing" id="result-warning-typing" aria-hidden="true" data-text="{% if analysis.outputs.dynamic_world_enabled and analysis.outputs.agric_after_composition %}The overall land-cover summary below is Agric U-Net's pixel-level prediction for the Esri Wayback snapshots. Dynamic World annual Sentinel-2 labels support the separate annual transition and forest-loss outputs. The U-Net has not been validated on these Wayback images. Forest-to-nonforest is a candidate forest-loss signal, not proof of deforestation.{% elif analysis.outputs.dynamic_world_enabled %}Primary land-cover and change estimates use Dynamic World annual Sentinel-2 classifications, not the Esri Wayback snapshots. Forest-to-nonforest is a candidate forest-loss signal, not proof of deforestation. The local CNN and U-Net outputs below are supplementary and have not been validated on these Wayback images.{% else %}Esri Wayback dates show when a release was published; imagery at this location may have been captured at another time. The CNN was trained on a separate image dataset and has not been validated specifically on these Wayback snapshots. Treat its class as a prediction and compare it with trusted local reference data. The change mask is a separate model output.{% endif %}"></span><span class="result-sr-only">{% if analysis.outputs.dynamic_world_enabled and analysis.outputs.agric_after_composition %}The overall land-cover summary below is Agric U-Net's pixel-level prediction for the Esri Wayback snapshots. Dynamic World annual Sentinel-2 labels support the separate annual transition and forest-loss outputs. The U-Net has not been validated on these Wayback images. Forest-to-nonforest is a candidate forest-loss signal, not proof of deforestation.{% elif analysis.outputs.dynamic_world_enabled %}Primary land-cover and change estimates use Dynamic World annual Sentinel-2 classifications, not the Esri Wayback snapshots. Forest-to-nonforest is a candidate forest-loss signal, not proof of deforestation. The local CNN and U-Net outputs below are supplementary and have not been validated on these Wayback images.{% else %}Esri Wayback dates show when a release was published; imagery at this location may have been captured at another time. The CNN was trained on a separate image dataset and has not been validated specifically on these Wayback snapshots. Treat its class as a prediction and compare it with trusted local reference data. The change mask is a separate model output.{% endif %}</span></p>
+
+  <section class="results-section">
+    <div class="section-heading"><h2>{% if analysis.outputs.dynamic_world_enabled %}Dynamic World change maps{% else %}Change detection{% endif %}</h2><p>{% if analysis.outputs.dynamic_world_enabled %}{{ analysis.outputs.changed_percentage }}% of classified annual pixels changed class{% else %}{{ analysis.outputs.changed_percentage }}% of pixels flagged by the unvalidated Wayback model{% endif %}</p></div>
+    {% if change_threshold_notice %}<p class="review-notice">{{ change_threshold_notice }}</p>{% endif %}
+    {% if analysis.outputs.dynamic_world_before_land_cover_layer %}
+      <div class="result-card map-card"><div id="dynamic-world-map" aria-label="Dynamic World annual land-cover and change maps"></div>
+        <div class="dynamic-world-layers" role="group" aria-label="Select Dynamic World map layer">
+          <button type="button" class="layer-button dynamic-world-layer" data-layer="{{ analysis.outputs.dynamic_world_before_land_cover_layer }}" data-title="{{ analysis.before_year }} Dynamic World land cover" aria-pressed="false">{{ analysis.before_year }} land cover</button>
+          <button type="button" class="layer-button dynamic-world-layer" data-layer="{{ analysis.outputs.dynamic_world_after_land_cover_layer }}" data-title="{{ analysis.after_year }} Dynamic World land cover" aria-pressed="true">{{ analysis.after_year }} land cover</button>
+          <button type="button" class="layer-button dynamic-world-layer" data-layer="{{ analysis.outputs.dynamic_world_change_layer }}" data-title="Dynamic World annual class-change mask" aria-pressed="false">Annual class-change mask</button>
+          <button type="button" class="layer-button dynamic-world-layer" data-layer="{{ analysis.outputs.dynamic_world_forest_loss_layer }}" data-title="Potential Dynamic World forest-loss mask" aria-pressed="false">Potential forest-loss mask</button>
+        </div>
+        <p class="local-transition-note">Underlying map: Esri satellite imagery. Colored overlays: Dynamic World annual labels / class transitions at nominal 10 m. The forest-loss layer marks Forest/Trees in the earlier year changing to any other Dynamic World class.</p>
+      </div>
+    {% endif %}
+    <h3>{% if analysis.outputs.dynamic_world_enabled %}Supplementary Wayback image-model output{% else %}Wayback image-model change estimate{% endif %}</h3>
+    <p>{% if analysis.outputs.dynamic_world_enabled %}The slider below changes only the local U-Net probability mask; it does not alter the Dynamic World annual class-change or forest-loss estimates.{% else %}The slider below changes the local U-Net probability mask. It does not rerun the model or change the separate CNN tile-classification estimates.{% endif %}</p>
+    <p>The model's default threshold is 0.65. Adjusting it inspects lower or higher U-Net probability pixels; it does not rerun or retrain the model.</p>
+    <form class="mask-threshold-form" method="post" action="{% url 'update-change-threshold' %}">
+      {% csrf_token %}
+      <input type="hidden" name="analysis_id" value="{{ analysis.analysis_id }}">
+      <label for="mask-threshold">Mask threshold <output id="mask-threshold-value">{{ analysis.outputs.change_threshold|default:'0.65' }}</output>
+        <input type="range" id="mask-threshold" name="threshold" min="0.10" max="0.90" step="0.05" value="{{ analysis.outputs.change_threshold|default:'0.65' }}">
+      </label>
+      <button type="submit">Regenerate mask</button>
+    </form>
+    {% if analysis.outputs.dynamic_world_enabled %}
+      {% if analysis.outputs.wayback_unet_changed_percentage == 0 %}<p class="mask-empty-note">No pixels crossed this Wayback U-Net threshold. The Dynamic World annual class-change share above is calculated separately.</p>{% endif %}
+    {% elif analysis.outputs.changed_percentage == 0 %}
+      <p class="mask-empty-note">No pixels crossed this threshold. The saved Wayback CNN mask is empty at this setting{% if analysis.outputs.maximum_change_probability %}; the maximum predicted change probability was {{ analysis.outputs.maximum_change_probability }}%{% endif %}. Lower the threshold to inspect weaker model signals.</p>
+    {% endif %}
+    <div class="model-results">
+      <figure class="result-card model-card"><h3>{{ analysis.before_year }} snapshot</h3><img src="{{ analysis.outputs.before_image }}" alt="Earlier imagery snapshot"><figcaption>Wayback release {{ analysis.outputs.before_release_date }}<br>CNN: {{ analysis.outputs.before_predicted_class }}</figcaption></figure>
+      <figure class="result-card model-card"><h3>{{ analysis.after_year }} snapshot</h3><img src="{{ analysis.outputs.after_image }}" alt="Later imagery snapshot"><figcaption>Wayback release {{ analysis.outputs.after_release_date }}<br>CNN: {{ analysis.outputs.after_predicted_class }}</figcaption></figure>
+      <figure class="result-card model-card"><h3>Absolute difference</h3><img src="{{ analysis.outputs.absolute_difference }}" alt="Absolute difference between snapshots"></figure>
+      <figure class="result-card model-card"><h3>Change probability</h3><img src="{{ analysis.outputs.change_probability }}" alt="Change model probability map"></figure>
+      <figure class="result-card model-card"><h3>Predicted change mask</h3><img src="{{ analysis.outputs.change_mask }}?threshold={{ analysis.outputs.change_threshold|default:'0.65' }}" alt="Predicted change mask"><figcaption>Bright pixels are flagged as changed.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="results-section">
+    <div class="section-heading"><h2>Selected area</h2><p>Zimbabwe, outlined on the map</p></div>
+    <div class="result-card map-card"><div id="result-map" aria-label="Selected analysis area"></div></div>
+    {% if analysis.outputs.dynamic_world_enabled %}
+      {% if analysis.outputs.dynamic_world_forest_loss_points %}
+        {{ analysis.outputs.dynamic_world_forest_loss_points|json_script:"forest-loss-points" }}
+      {% else %}
+        <script id="forest-loss-points" type="application/json">[]</script>
+      {% endif %}
+      <p class="forest-loss-map-note">Red dots mark sampled potential Forest-to-non-Forest transitions from Dynamic World ({{ analysis.outputs.dynamic_world_forest_loss_points|length }} shown). They are approximate candidate locations, not verified deforestation.</p>
+    {% elif analysis.outputs.local_forest_loss_points %}
+      {{ analysis.outputs.local_forest_loss_points|json_script:"forest-loss-points" }}
+      <p class="forest-loss-map-note">Red dots mark {{ analysis.outputs.local_forest_loss_points|length }} local CNN tile(s) classified Forest in {{ analysis.before_year }} and Deforestation in {{ analysis.after_year }}. Candidate locations are approximate, unvalidated model predictions—not confirmed deforestation.</p>
+    {% elif analysis.outputs.forest_loss_detection_error %}
+      <p class="forest-loss-map-note">{{ analysis.outputs.forest_loss_detection_error }}</p>
+    {% else %}
+      <script id="forest-loss-points" type="application/json">[]</script>
+      <p class="forest-loss-map-note">No local CNN tiles met the Forest-to-Deforestation confidence threshold for these years. This does not establish that no deforestation occurred.</p>
+    {% endif %}
+  </section>
+
+  <section class="results-section">
+    <div class="section-heading"><h2>Land-cover classification</h2><p>{% if analysis.outputs.agric_after_composition %}Agric U-Net · pixel-level snapshot area shares{% elif analysis.outputs.dynamic_world_enabled %}Google Dynamic World · nominal 10 m{% else %}Unvalidated Wayback CNN estimate{% endif %}</p></div>
+    <div class="result-card class-result">
+      {% if analysis.outputs.agric_after_composition %}
+        <div>
+          <h3>Overall land-cover estimate: {{ analysis.outputs.agric_after_dominant_class }}</h3>
+          <p>This summary counts the Agric U-Net pixel predictions across each complete Wayback snapshot. The snapshot is classified in overlapping model-sized windows at its original pixel resolution, so mixed land cover is shown as class shares without first shrinking the whole image to one model input.</p>
+          <p><strong>{{ analysis.before_year }} area composition</strong></p>
+          <p>{% for item in analysis.outputs.agric_before_composition %}{{ item.name }} {{ item.percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p>
+          <p><strong>{{ analysis.after_year }} area composition</strong></p>
+          <p>{% for item in analysis.outputs.agric_after_composition %}{{ item.name }} {{ item.percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p>
+          <p>The dominant class is the largest predicted share. These estimates have not been validated for the Wayback imagery.</p>
+        </div>
+        <img src="{{ analysis.outputs.agric_after_prediction }}" alt="Pixel-level land-cover prediction for {{ analysis.after_year }} snapshot">
+      {% elif analysis.outputs.dynamic_world_enabled %}
+        <div><h3>Dynamic World annual classification</h3><p>Annual dominant class: <strong>{{ analysis.before_year }} {{ analysis.outputs.dynamic_world_before_dominant_class }}</strong> &rarr; <strong>{{ analysis.after_year }} {{ analysis.outputs.dynamic_world_after_dominant_class }}</strong>.</p>
+          <p><strong>{{ analysis.before_year }} annual class shares</strong></p><p>{% for item in analysis.outputs.dynamic_world_before_classes %}{{ item.name }} {{ item.percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p>
+          <p><strong>{{ analysis.after_year }} annual class shares</strong></p><p>{% for item in analysis.outputs.dynamic_world_after_classes %}{{ item.name }} {{ item.percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p>
+          <p>Source: Google Dynamic World Sentinel-2 labels, annual mode at nominal 10 m. These dates are not the Esri Wayback release capture dates. {% if analysis.after_year == 2026 %}The 2026 label is year-to-date and incomplete.{% endif %}</p>
+        </div>
+      {% else %}
+        <div><h3>Unvalidated Wayback CNN estimate: {{ analysis.outputs.after_predicted_class }}</h3><p>Later snapshot model score: <strong>{% if analysis.outputs.after_class_confidence %}{{ analysis.outputs.after_class_confidence|floatformat:1 }}%{% else %}not recorded; run a new analysis{% endif %}</strong>. Earlier snapshot estimate: <strong>{{ analysis.outputs.before_predicted_class }}</strong> ({% if analysis.outputs.before_class_confidence %}{{ analysis.outputs.before_class_confidence|floatformat:1 }}%{% else %}score not recorded{% endif %}).</p><p>This model was trained on a separate image dataset. Its score is not a calibrated probability and its land-cover result is not validated for these satellite snapshots.</p>
+          {% if analysis.outputs.classification_method == 'whole_snapshot_aspect_preserved' %}
+            <p><strong>Whole-snapshot CNN class scores (not calibrated probabilities)</strong></p>
+            <p>{{ analysis.before_year }}: {% for class_name, percentage in analysis.outputs.before_class_probabilities.items %}{{ class_name }} {{ percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p>
+            <p>{{ analysis.after_year }}: {% for class_name, percentage in analysis.outputs.after_class_probabilities.items %}{{ class_name }} {{ percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p>
+          {% elif analysis.outputs.after_land_cover_composition %}
+            <p><strong>Estimated tile composition</strong></p><p>{{ analysis.before_year }}: {% for class_name, percentage in analysis.outputs.before_land_cover_composition.items %}{{ class_name }} {{ percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p><p>{{ analysis.after_year }}: {% for class_name, percentage in analysis.outputs.after_land_cover_composition.items %}{{ class_name }} {{ percentage|floatformat:1 }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p>
+          {% endif %}
+        </div>
+        <img src="{{ analysis.outputs.overlay }}?threshold={{ analysis.outputs.change_threshold|default:'0.65' }}" alt="Later snapshot with supplementary model change overlay">
+      {% endif %}
+    </div>
+    </section>
+    <section class="results-section" id="agric-predictions" aria-label="Pixel-level land-cover predictions">
+      <div class="section-heading"><h2>Pixel-level land-cover predictions</h2><p>Classification of the same Wayback snapshots</p></div>
+      {% if analysis.outputs.agric_prediction_error %}
+        <p class="result-warning">The pixel-level prediction could not be generated: {{ analysis.outputs.agric_prediction_error }}</p>
+      {% elif analysis.outputs.agric_before_prediction and analysis.outputs.agric_after_prediction %}
+        <div class="agric-legend" role="list" aria-label="Land-cover prediction legend">
+          <span class="agric-legend-item" role="listitem"><i class="agric-legend-swatch" style="background:#00ffff"></i>Urban</span>
+          <span class="agric-legend-item" role="listitem"><i class="agric-legend-swatch" style="background:#ffff00"></i>Agriculture</span>
+          <span class="agric-legend-item" role="listitem"><i class="agric-legend-swatch" style="background:#ff00ff"></i>Rangeland</span>
+          <span class="agric-legend-item" role="listitem"><i class="agric-legend-swatch" style="background:#00ff00"></i>Forest</span>
+          <span class="agric-legend-item" role="listitem"><i class="agric-legend-swatch" style="background:#0000ff"></i>Water</span>
+          <span class="agric-legend-item" role="listitem"><i class="agric-legend-swatch" style="background:#ffffff"></i>Barren</span>
+        </div>
+        <div class="agric-predictions">
+          <article class="agric-prediction-card">
+            <h3>{{ analysis.before_year }} predicted land cover</h3>
+            <img src="{{ analysis.outputs.agric_before_prediction }}" alt="Pixel-level land-cover prediction for {{ analysis.before_year }} snapshot">
+            <p class="agric-composition">{% for item in analysis.outputs.agric_before_composition %}<strong>{{ item.name }}</strong> {{ item.percentage|floatformat:1 }}%{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+          </article>
+          <article class="agric-prediction-card">
+            <h3>{{ analysis.after_year }} predicted land cover</h3>
+            <img src="{{ analysis.outputs.agric_after_prediction }}" alt="Pixel-level land-cover prediction for {{ analysis.after_year }} snapshot">
+            <p class="agric-composition">{% for item in analysis.outputs.agric_after_composition %}<strong>{{ item.name }}</strong> {{ item.percentage|floatformat:1 }}%{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+          </article>
+        </div>
+        <p class="local-transition-note">These supplementary pixel-level predictions have not been validated for the Wayback imagery.</p>
+      {% else %}
+        <p class="local-transition-note">Pixel-level predictions are unavailable for this saved analysis. Run a new map analysis to classify both snapshots.</p>
+      {% endif %}
+    </section>
+    {% if review_notice %}<p class="review-notice">{{ review_notice }}</p>{% endif %}
+    {% if analysis.reviewed_classes.before or analysis.reviewed_classes.after %}
+    <p>Reviewed reference labels:{% if analysis.reviewed_classes.before %} {{ analysis.before_year }}: <strong>{{ analysis.reviewed_classes.before }}</strong>{% endif %}{% if analysis.reviewed_classes.after %} {{ analysis.after_year }}: <strong>{{ analysis.reviewed_classes.after }}</strong>{% endif %}</p>
+    {% endif %}
+    <div class="class-review">
+      <h3>Record a reviewed reference label</h3>
+      <p>Use this after checking trusted reference data. It records your review separately; it does not alter the CNN prediction or retrain the model.</p>
+      <form method="post" action="{% url 'record-class-review' %}">
+        {% csrf_token %}
+        <input type="hidden" name="analysis_id" value="{{ analysis.analysis_id }}">
+        <label for="review-snapshot">Snapshot
+          <select name="snapshot" id="review-snapshot"><option value="after">Later ({{ analysis.after_year }})</option><option value="before">Earlier ({{ analysis.before_year }})</option></select>
+        </label>
+        <label for="reference-class">Reviewed class
+          <select name="reference_class" id="reference-class">{% for class_name in class_names %}<option value="{{ class_name }}">{{ class_name }}</option>{% endfor %}</select>
+        </label>
+        <button type="submit">Save reference label</button>
+      </form>
+    </div>
+  <div class="results-actions"><a class="back-link" href="{% url 'home' %}">&larr; Choose another area</a><span class="results-footnote">Predictions should be checked against local reference data.</span></div>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const resultWarning = document.getElementById('result-warning-typing');
+    if (resultWarning) {
+      const warningText = resultWarning.dataset.text;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        resultWarning.textContent = warningText;
+        resultWarning.classList.remove('result-warning-typing');
+      } else {
+        let warningPosition = 0;
+        const warningTimer = window.setInterval(() => {
+          resultWarning.textContent += warningText.charAt(warningPosition);
+          warningPosition += 1;
+          if (warningPosition >= warningText.length) {
+            window.clearInterval(warningTimer);
+            resultWarning.classList.remove('result-warning-typing');
+          }
+        }, 16);
+      }
+    }
+    const maskThreshold = document.getElementById('mask-threshold');
+    const maskThresholdValue = document.getElementById('mask-threshold-value');
+    maskThreshold.addEventListener('input', () => {
+      maskThresholdValue.value = Number(maskThreshold.value).toFixed(2);
+    });
+    const resultBounds = L.latLngBounds(
+      [{{ analysis.bounds.south }}, {{ analysis.bounds.west }}],
+      [{{ analysis.bounds.north }}, {{ analysis.bounds.east }}]
+    );
+    const resultMap = L.map('result-map').fitBounds(resultBounds, { padding: [28, 28] });
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom: 18, maxZoom: 22, attribution: 'Tiles &copy; Esri'
+    }).addTo(resultMap);
+    L.rectangle(resultBounds, { color: '#b13f2f', weight: 3, fill: false }).addTo(resultMap);
+    const forestLossPointsElement = document.getElementById('forest-loss-points');
+    if (forestLossPointsElement) {
+      JSON.parse(forestLossPointsElement.textContent).forEach(([latitude, longitude]) => {
+        L.circleMarker([latitude, longitude], {
+          radius: 5, color: '#fff', weight: 1, fillColor: '#ef2929', fillOpacity: 1
+        })
+          .bindTooltip('Potential forest loss')
+          .bindPopup('The selected model detected a candidate Forest-to-Deforestation signal here. This is not verified deforestation.')
+          .addTo(resultMap);
+      });
+    }
+    window.requestAnimationFrame(() => resultMap.invalidateSize());
+    const dynamicWorldMapElement = document.getElementById('dynamic-world-map');
+    if (dynamicWorldMapElement) {
+      const dynamicWorldMap = L.map(dynamicWorldMapElement).fitBounds(resultBounds, { padding: [20, 20] });
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxNativeZoom: 18, maxZoom: 22, attribution: 'Basemap tiles &copy; Esri'
+      }).addTo(dynamicWorldMap);
+      const dynamicWorldLayerButtons = document.querySelectorAll('.dynamic-world-layer');
+      let activeDynamicWorldLayer = null;
+      dynamicWorldLayerButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          if (activeDynamicWorldLayer) dynamicWorldMap.removeLayer(activeDynamicWorldLayer);
+          activeDynamicWorldLayer = L.tileLayer(button.dataset.layer, {
+            maxZoom: 22, opacity: 0.82, attribution: 'Land-cover data &copy; Google Dynamic World'
+          }).addTo(dynamicWorldMap);
+          dynamicWorldLayerButtons.forEach((item) => item.setAttribute('aria-pressed', 'false'));
+          button.setAttribute('aria-pressed', 'true');
+        });
+      });
+      const selectedDynamicWorldLayer = document.querySelector('.dynamic-world-layer[aria-pressed="true"]');
+      if (selectedDynamicWorldLayer) selectedDynamicWorldLayer.click();
+      window.requestAnimationFrame(() => dynamicWorldMap.invalidateSize());
+    }
+  </script>
+{% endif %}
+ </div>
+{% endblock content %}

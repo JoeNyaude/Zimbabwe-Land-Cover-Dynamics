@@ -1,0 +1,602 @@
+{% extends "base.html" %}
+
+{% block title %}ZIMLCD Change Analysis{% endblock %}
+{% block breadcrumb %}Change Analysis{% endblock %}
+{% block heading %}Change Analysis{% endblock %}
+{% block nav_change %}active{% endblock %}
+
+{% block content %}
+<style>
+	.analysis-intro {
+		max-width: 850px;
+		margin: 0 0 16px;
+		color: #5d6a70;
+	}
+
+	.analysis-controls {
+		display: flex;
+		align-items: end;
+		flex-wrap: wrap;
+		gap: 12px;
+		margin-bottom: 16px;
+		padding: 14px 16px;
+		border: 1px solid #c2c5bd;
+		background: #f4f1e8;
+	}
+
+	.analysis-controls label {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		color: #34474f;
+		font-size: 11px;
+		font-weight: bold;
+	}
+
+	.analysis-controls input,
+	.analysis-controls select,
+	.analysis-controls button {
+		min-height: 32px;
+		border: 1px solid #8e9ca3;
+		border-radius: 0;
+		padding: 5px 9px;
+		background: #fff;
+		color: #263940;
+		font: inherit;
+	}
+
+	.analysis-controls button {
+		background: #d2dfe8;
+		color: #173d5e;
+		cursor: pointer;
+		font-weight: bold;
+	}
+
+	.analysis-controls button:hover {
+		background: #bfd2df;
+	}
+
+	.analysis-controls button:disabled {
+		cursor: wait;
+		opacity: 0.65;
+	}
+
+	.analysis-loader {
+		display: inline-block;
+		width: 13px;
+		height: 13px;
+		margin-right: 7px;
+		border: 2px solid currentColor;
+		border-right-color: transparent;
+		border-radius: 50%;
+		vertical-align: -2px;
+		animation: analysis-spin 0.7s linear infinite;
+	}
+	.analysis-loader[hidden] { display: none !important; }
+
+	.analysis-progress {
+		margin: -7px 0 16px;
+		padding: 12px 16px;
+		border: 1px solid #c2c5bd;
+		background: #f4f1e8;
+		color: #34474f;
+	}
+	.analysis-progress[hidden] { display: none !important; }
+	.analysis-progress p { margin: 0 0 8px; font-size: 12px; }
+	.analysis-progress-track { position: relative; height: 8px; overflow: hidden; background: #e5e7eb; }
+	.analysis-progress-bar {
+		width: 0;
+		height: 100%;
+		background: #4b5563;
+		transition: width 800ms ease;
+	}
+	.analysis-progress-time { margin-top: 7px !important; font-variant-numeric: tabular-nums; }
+	@media (prefers-reduced-motion: reduce) { .analysis-progress-bar { transition: none; } }
+
+	@keyframes analysis-spin { to { transform: rotate(360deg); } }
+	@media (prefers-reduced-motion: reduce) { .analysis-loader { animation-duration: 1.8s; } }
+
+	#analysis-map {
+		width: 100%;
+		height: clamp(560px, 78vh, 900px);
+		min-height: 560px;
+	}
+
+	.map-workspace { border:1px solid #aab2ad; background:#faf8f2; box-shadow:0 3px 12px rgba(20,42,52,.08); }
+	.map-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 14px; border-bottom:1px solid #c2c5bd; background:#eeece4; }
+	.map-toolbar-title { margin:0; color:#173d5e; font-size:14px; }
+	.map-toolbar-subtitle { margin:2px 0 0; color:#5d6a70; font-size:11px; }
+	.map-toolbar-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+	.map-go-to { min-height:34px; padding:6px 9px; border:1px solid #8e9ca3; background:#fff; color:#263940; font:inherit; font-size:11px; }
+	.map-reset { min-height:34px; padding:6px 10px; border:1px solid #8e9ca3; background:#d2dfe8; color:#173d5e; font:inherit; font-size:11px; font-weight:bold; cursor:pointer; }
+	.map-reset:hover { background:#bfd2df; }
+	.map-footer { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-top:1px solid #c2c5bd; background:#f4f1e8; color:#5d6a70; font-size:11px; }
+	.map-footer .map-status { flex:1; margin:0; }
+	.map-coordinates { white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+	#analysis-map .leaflet-container {
+		width: 100%;
+		height: 100%;
+	}
+
+	/* Keep tile positioning intact if the external Leaflet stylesheet is delayed. */
+	#analysis-map .leaflet-pane,
+	#analysis-map .leaflet-tile,
+	#analysis-map .leaflet-marker-icon,
+	#analysis-map .leaflet-marker-shadow,
+	#analysis-map .leaflet-tile-container {
+		position: absolute;
+		left: 0;
+		top: 0;
+	}
+
+	#analysis-map .leaflet-container {
+		overflow: hidden;
+		background: #dce5e6;
+	}
+
+	#analysis-map .leaflet-tile {
+		max-width: none;
+		width: 256px;
+		height: 256px;
+	}
+
+	.city-tooltip {
+		padding: 2px 5px;
+		border: 1px solid rgba(39, 48, 48, 0.7);
+		border-radius: 2px;
+		background: rgba(255, 252, 235, 0.9);
+		box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
+		color: #28383b;
+		font-size: 11px;
+		font-weight: bold;
+		white-space: nowrap;
+	}
+	#analysis-map .leaflet-control-layers {
+		border:1px solid #9da9a9;
+		border-radius:2px;
+		background:#fff;
+		color:#263940 !important;
+		box-shadow:0 1px 5px rgba(0,0,0,.2);
+	}
+	/* Keep Leaflet's native controls readable when the site theme sets panel text to white. */
+	#analysis-map .leaflet-control-layers label,
+	#analysis-map .leaflet-control-layers label span,
+	#analysis-map .leaflet-control-layers-list { color:#263940 !important; }
+	#analysis-map .leaflet-bar a {
+		background-color:#fff;
+		color:#173d5e !important;
+	}
+	#analysis-map .leaflet-bar a:hover { background-color:#f1f5f7; color:#102f49 !important; }
+
+	.city-tooltip::before {
+		border-right-color: rgba(39, 48, 48, 0.7);
+	}
+
+	.map-status {
+		min-height: 22px;
+		color: #4e6b3c;
+		font-size: 12px;
+	}
+
+	.map-status.error {
+		color: #8a392f;
+	}
+
+	.map-note {
+		margin: 9px 0 0;
+		color: #5d6a70;
+		font-size: 11px;
+	}
+	.reference-legend {
+		min-width:190px;
+		padding:10px 12px;
+		border:1px solid #6b7280;
+		background:#111827;
+		color:#f9fafb;
+		box-shadow:0 1px 5px rgba(0,0,0,.35);
+		font:12px/1.5 Inter,'Segoe UI',Arial,sans-serif;
+	}
+	.reference-legend-title { margin-bottom:5px; color:#fff; font-weight:700; }
+	.reference-legend-row { display:flex; align-items:center; gap:8px; color:#e5e7eb; }
+	.reference-legend-mark { display:inline-block; flex:0 0 11px; width:11px; height:11px; border:2px solid #fff; border-radius:50%; }
+	.reference-legend-mark.water { background:#2563eb; border-color:#fff; }
+	.reference-legend-mark.forest { background:#16a34a; }
+	.reference-legend-mark.alert { background:#dc2626; }
+	@media (max-width: 700px) {
+		#analysis-map {
+			height: 70vh;
+			min-height: 440px;
+		}
+	}
+	@media (max-width: 520px) { .map-toolbar { align-items:flex-start; } .map-footer { align-items:flex-start; flex-direction:column; } .map-coordinates { white-space:normal; } }
+</style>
+
+<section class="map-workspace" aria-label="Zimbabwe area selection map">
+	<div class="map-toolbar">
+		<div><h2 class="map-toolbar-title">Select an area in Zimbabwe</h2><p class="map-toolbar-subtitle">Country view · Draw a rectangle to define the analysis area</p></div>
+		<div class="map-toolbar-actions">
+			<label class="map-toolbar-subtitle" for="map-go-to">Go to city</label>
+			<select class="map-go-to" id="map-go-to"><option value="">Choose a city or town</option>{% for name, latitude, longitude in place_points %}<option value="{{ latitude }},{{ longitude }}">{{ name }}</option>{% endfor %}</select>
+			<button class="map-reset" id="reset-map-view" type="button">Show Zimbabwe</button>
+		</div>
+	</div>
+	<div id="analysis-map" aria-label="Map for selecting a change analysis area"></div>
+	<div class="map-footer"><p class="map-status" id="map-status" role="status">Draw a rectangle on the map to select an area.</p><span class="map-coordinates" id="map-coordinates">Zimbabwe · 15.5°–22.5° S, 25.2°–33.1° E</span></div>
+</section>
+<p class="analysis-intro">Select an area and two years. ZIMLCD fetches dated Esri Wayback satellite imagery and runs its local CNN and change-detection models on the selected snapshots.</p>
+<p class="analysis-intro">For a single-image land-cover segmentation using the Agric U-Net, open <a href="{% url 'agriculture-prediction' %}">Agriculture Prediction</a>.</p>
+<form class="analysis-controls" id="analysis-form">
+	<label>
+		Earlier year
+		<select id="before-year" name="before_year">
+			<option value="2023" selected>2023</option>
+			<option value="2024">2024</option>
+			<option value="2025">2025</option>
+			<option value="2026">2026</option>
+		</select>
+	</label>
+	<label>
+		Area label (suggested from map)
+		<input id="location-name" name="location_name" type="text" maxlength="120" placeholder="Draw a rectangle to suggest a nearby town">
+	</label>
+	<label>
+		Later year
+		<select id="after-year" name="after_year">
+			<option value="2024">2024</option>
+			<option value="2025">2025</option>
+			<option value="2026" selected>2026</option>
+		</select>
+	</label>
+	<button type="submit" id="analyze-button"><span class="analysis-loader" id="analysis-loader" aria-hidden="true" hidden></span><span id="analyze-button-label">Prepare analysis</span></button>
+</form>
+<div class="analysis-progress" id="analysis-progress" role="status" aria-live="polite" hidden>
+	<p id="analysis-progress-message">Preparing imagery and running the classification models.</p>
+	<div class="analysis-progress-track" id="analysis-progress-track" role="progressbar" aria-label="Estimated analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Preparing imagery and classifying snapshots">
+		<div class="analysis-progress-bar"></div>
+	</div>
+	<p class="analysis-progress-time" id="analysis-progress-time">Estimated time remaining: about 3:00 (initial estimate)</p>
+</div>
+<p class="map-note">{% if place_geocoding_enabled %}The area label will be matched to a nearby locality and saved with the analysis; you can edit it before running the model.{% else %}The suggested name is the nearest mapped town and is approximate; configure an ArcGIS API key to enable automatic neighborhood and city lookup. You can edit the label at any time.{% endif %} The snapshot itself uses the exact rectangle bounds shown on the map.</p>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+{{ place_points|json_script:"map-place-points" }}
+{{ water_body_points|json_script:"map-water-body-points" }}
+{{ forest_points|json_script:"map-forest-points" }}
+{{ forest_alert_areas|json_script:"forest-alert-areas" }}
+<script>
+	const zimbabweBounds = L.latLngBounds(
+		[-22.5, 25.2],
+		[-15.5, 33.1]
+	);
+	const map = L.map('analysis-map', {
+		maxBounds: zimbabweBounds,
+		maxBoundsViscosity: 1.0,
+		minZoom: 6,
+		maxZoom: 24,
+		zoomSnap: 0.25
+	}).fitBounds(zimbabweBounds, { padding: [24, 24], maxZoom: 7.5 });
+	let cityViewSelected = false;
+	const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		maxZoom: 19,
+		attribution: '&copy; OpenStreetMap contributors'
+	});
+	const imagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+		maxNativeZoom: 18,
+		maxZoom: 24,
+		attribution: 'Tiles &copy; Esri'
+	});
+	const placeLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+		maxNativeZoom: 19,
+		maxZoom: 24,
+		attribution: 'Place labels &copy; Esri and contributors',
+		pane: 'overlayPane'
+	});
+	const satelliteWithLabels = L.layerGroup([imagery, placeLabels]).addTo(map);
+	const drawnItems = new L.FeatureGroup().addTo(map);
+	const waterBodyLayer = L.layerGroup().addTo(map);
+	const forestLayer = L.layerGroup().addTo(map);
+	const boundaryLayer = L.geoJSON(null, {
+		style: {
+			color: '#b13f2f',
+			weight: 3,
+			dashArray: '8 5',
+			fillColor: '#d7a13a',
+			fillOpacity: 0.12
+		}
+	}).addTo(map);
+	const cityLabels = L.layerGroup();
+	const placePoints = JSON.parse(document.getElementById('map-place-points').textContent);
+	const waterBodyPoints = JSON.parse(document.getElementById('map-water-body-points').textContent);
+	const forestPoints = JSON.parse(document.getElementById('map-forest-points').textContent);
+	const forestAlertAreas = JSON.parse(document.getElementById('forest-alert-areas').textContent);
+	function addReferenceMarkers(points, targetLayer, markerStyle, category) {
+		points.forEach(([name, latitude, longitude]) => {
+			const popup = document.createElement('div');
+			const title = document.createElement('strong');
+			title.textContent = name;
+			const type = document.createElement('div');
+			type.textContent = category + ' reference point';
+			popup.append(title, type);
+			L.circleMarker([latitude, longitude], markerStyle)
+				.bindTooltip(name, { direction:'top', offset:[0,-7] })
+				.bindPopup(popup)
+				.addTo(targetLayer);
+		});
+	}
+	addReferenceMarkers(waterBodyPoints, waterBodyLayer, {
+		radius:7, color:'#ffffff', weight:2, fillColor:'#2563eb', fillOpacity:1
+	}, 'Water body');
+	addReferenceMarkers(forestPoints, forestLayer, {
+		radius:7, color:'#ffffff', weight:2, fillColor:'#16a34a', fillOpacity:1
+	}, 'Forest');
+	const forestAlertLayer = L.layerGroup().addTo(map);
+	forestAlertAreas.forEach((area) => {
+		const popup = document.createElement('div');
+		const title = document.createElement('strong');
+		const evidence = document.createElement('p');
+		const source = document.createElement('a');
+		const coordinates = document.createElement('a');
+		title.textContent = area.name;
+		evidence.textContent = area.evidence;
+		source.href = area.source_url;
+		source.target = '_blank';
+		source.rel = 'noopener noreferrer';
+		source.textContent = area.source_label;
+		coordinates.href = area.coordinate_url;
+		coordinates.target = '_blank';
+		coordinates.rel = 'noopener noreferrer';
+		coordinates.textContent = 'Approximate region anchor (OpenStreetMap)';
+		popup.append(title, evidence, source, document.createElement('br'), coordinates);
+		L.circleMarker([area.latitude, area.longitude], {
+			radius: 8,
+			color: '#ffffff',
+			weight: 2,
+			fillColor: '#dc2626',
+			fillOpacity: 1
+		})
+			.bindTooltip(area.name, { direction:'top', offset:[0,-8] })
+			.bindPopup(popup)
+			.addTo(forestAlertLayer);
+	});
+	placePoints.forEach(([name, latitude, longitude]) => {
+		L.circleMarker([latitude, longitude], {
+			radius: 4,
+			color: '#ffffff',
+			weight: 1,
+			fillColor: '#b13f2f',
+			fillOpacity: 1
+		})
+			.bindTooltip(name, {
+				permanent: true,
+				direction: 'right',
+				offset: [7, 0],
+				className: 'city-tooltip'
+			})
+			.addTo(cityLabels);
+	});
+	fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries/ZWE.geo.json')
+		.then((response) => response.json())
+		.then((data) => {
+			boundaryLayer.addData(data);
+			if (!cityViewSelected) map.fitBounds(boundaryLayer.getBounds(), { padding: [24, 24], maxZoom: 7.5 });
+			boundaryLayer.bringToFront();
+		})
+		.catch(() => {});
+	window.requestAnimationFrame(() => map.invalidateSize());
+	window.addEventListener('resize', () => map.invalidateSize());
+
+	L.control.layers(
+		{ 'Satellite + place labels': satelliteWithLabels, 'Satellite only': imagery, 'Street map': osm },
+		{ 'Zimbabwe boundary': boundaryLayer, 'Cities and towns': cityLabels, 'Water bodies': waterBodyLayer, 'Forests': forestLayer, 'High-alert forest-loss regions (approx.)': forestAlertLayer },
+		{ position: 'topright', collapsed: true }
+	).addTo(map);
+	const referenceLegend = L.control({ position:'bottomright' });
+	referenceLegend.onAdd = function () {
+		const container = L.DomUtil.create('div', 'reference-legend');
+		container.innerHTML = '<div class="reference-legend-title">Map reference points</div>'
+			+ '<div class="reference-legend-row"><span class="reference-legend-mark alert"></span>High-alert regions (' + forestAlertAreas.length + ')</div>'
+			+ '<div class="reference-legend-row"><span class="reference-legend-mark water"></span>Water bodies (' + waterBodyPoints.length + ')</div>'
+			+ '<div class="reference-legend-row"><span class="reference-legend-mark forest"></span>Forests (' + forestPoints.length + ')</div>';
+		L.DomEvent.disableClickPropagation(container);
+		return container;
+	};
+	referenceLegend.addTo(map);
+	document.getElementById('reset-map-view').addEventListener('click', () => {
+		cityViewSelected = false;
+		document.getElementById('map-go-to').value = '';
+		map.fitBounds(zimbabweBounds, { padding: [24, 24], maxZoom: 7.5 });
+	});
+	document.getElementById('map-go-to').addEventListener('change', (event) => {
+		if (!event.target.value) return;
+		const [latitude, longitude] = event.target.value.split(',').map(Number);
+		cityViewSelected = true;
+		map.flyTo([latitude, longitude], 11.5, { duration: 0.8 });
+	});
+	const coordinateReadout = document.getElementById('map-coordinates');
+	map.on('mousemove', (event) => {
+		coordinateReadout.textContent = `${event.latlng.lat.toFixed(3)}° ${event.latlng.lat < 0 ? 'S' : 'N'}, ${event.latlng.lng.toFixed(3)}° ${event.latlng.lng < 0 ? 'W' : 'E'}`;
+	});
+	map.on('mouseout', () => {
+		coordinateReadout.textContent = 'Zimbabwe bounds';
+	});
+	map.addControl(new L.Control.Draw({
+		edit: { featureGroup: drawnItems },
+		draw: { polygon: false, polyline: false, circle: false, marker: false, circlemarker: false }
+	}));
+
+	let selectedBounds = null;
+	const status = document.getElementById('map-status');
+	const button = document.getElementById('analyze-button');
+	const loader = document.getElementById('analysis-loader');
+	const buttonLabel = document.getElementById('analyze-button-label');
+	const progress = document.getElementById('analysis-progress');
+	const progressTrack = document.getElementById('analysis-progress-track');
+	const progressBar = progressTrack.querySelector('.analysis-progress-bar');
+	const progressTime = document.getElementById('analysis-progress-time');
+	const locationInput = document.getElementById('location-name');
+	const durationStorageKey = 'zimlcd-analysis-durations-v1';
+	function recentAnalysisDurations() {
+		try {
+			const durations = JSON.parse(localStorage.getItem(durationStorageKey) || '[]');
+			return Array.isArray(durations) ? durations.filter((duration) => Number.isFinite(duration) && duration > 0).slice(-5) : [];
+		} catch {
+			return [];
+		}
+	}
+	function estimatedAnalysisDuration() {
+		const durations = recentAnalysisDurations().sort((first, second) => first - second);
+		return durations.length ? durations[Math.floor(durations.length / 2)] : 180;
+	}
+	function formatDuration(seconds) {
+		const minutes = Math.floor(seconds / 60);
+		return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+	}
+	let locationNameEdited = false;
+	let nearestPlaceName = '';
+	locationInput.addEventListener('input', () => {
+		locationNameEdited = Boolean(locationInput.value.trim());
+	});
+	function nearestPlace(bounds) {
+		const center = bounds.getCenter();
+		const radians = (degrees) => degrees * Math.PI / 180;
+		return placePoints.reduce((nearest, place) => {
+			const latitudeDistance = radians(place[1] - center.lat);
+			const longitudeDistance = Math.cos(radians(center.lat)) * radians(place[2] - center.lng);
+			const distance = latitudeDistance ** 2 + longitudeDistance ** 2;
+			return distance < nearest.distance ? { name:place[0], distance } : nearest;
+		}, { name:'', distance:Infinity }).name;
+	}
+	function suggestAreaName(bounds) {
+		nearestPlaceName = nearestPlace(bounds);
+		if (!locationNameEdited) locationInput.value = `Near ${nearestPlaceName} (approx.)`;
+	}
+
+	map.on(L.Draw.Event.CREATED, (event) => {
+		if (!zimbabweBounds.contains(event.layer.getBounds())) {
+			status.className = 'map-status error';
+			status.textContent = 'Select an area completely within Zimbabwe.';
+			return;
+		}
+		drawnItems.clearLayers();
+		drawnItems.addLayer(event.layer);
+		selectedBounds = event.layer.getBounds();
+		suggestAreaName(selectedBounds);
+		status.className = 'map-status';
+		status.textContent = `Area selected near ${nearestPlaceName}. The saved map bounds will pinpoint the snapshot area.`;
+	});
+
+	map.on(L.Draw.Event.EDITED, (event) => {
+		event.layers.eachLayer((layer) => {
+			if (!zimbabweBounds.contains(layer.getBounds())) {
+				drawnItems.removeLayer(layer);
+				selectedBounds = null;
+				status.className = 'map-status error';
+				status.textContent = 'Keep the selected area completely within Zimbabwe.';
+				return;
+			}
+			selectedBounds = layer.getBounds();
+			suggestAreaName(selectedBounds);
+		});
+	});
+
+	map.on(L.Draw.Event.DELETED, () => {
+		selectedBounds = null;
+		nearestPlaceName = '';
+		if (!locationNameEdited) locationInput.value = '';
+		status.className = 'map-status';
+		status.textContent = 'Draw a rectangle on the map to select an area.';
+	});
+
+	document.getElementById('analysis-form').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		if (!selectedBounds) {
+			status.className = 'map-status error';
+			status.textContent = 'Select an area on the map before preparing the analysis.';
+			return;
+		}
+
+		const beforeYear = Number(document.getElementById('before-year').value);
+		const afterYear = Number(document.getElementById('after-year').value);
+		button.disabled = true;
+		loader.hidden = false;
+		buttonLabel.hidden = true;
+		button.setAttribute('aria-label', 'Classifying imagery');
+		progress.hidden = false;
+		const startedAt = performance.now();
+		const durations = recentAnalysisDurations();
+		const estimatedSeconds = estimatedAnalysisDuration();
+		const estimateBasis = durations.length ? 'based on recent runs' : 'initial estimate';
+		let progressTimer;
+		const updateProgress = () => {
+			const elapsedSeconds = Math.floor((performance.now() - startedAt) / 1000);
+			const remainingSeconds = Math.max(0, Math.ceil(estimatedSeconds - elapsedSeconds));
+			const percent = Math.min(92, Math.floor(elapsedSeconds / estimatedSeconds * 92));
+			progressBar.style.width = `${percent}%`;
+			progressTrack.setAttribute('aria-valuenow', String(percent));
+			if (remainingSeconds > 0) {
+				progressTime.textContent = `Estimated time remaining: ${formatDuration(remainingSeconds)} · elapsed: ${formatDuration(elapsedSeconds)} (${estimateBasis})`;
+				progressTrack.setAttribute('aria-valuetext', `Estimated ${formatDuration(remainingSeconds)} remaining`);
+			} else {
+				const overSeconds = elapsedSeconds - Math.ceil(estimatedSeconds);
+				progressTime.textContent = `Taking longer than estimated by ${formatDuration(overSeconds)} · still preparing analysis`;
+				progressTrack.setAttribute('aria-valuetext', `Taking longer than estimated by ${formatDuration(overSeconds)}`);
+			}
+		};
+		updateProgress();
+		progressTimer = window.setInterval(updateProgress, 1000);
+		status.className = 'map-status';
+		status.textContent = 'Analysis is running. You can follow its progress above.';
+		// Let the browser paint the progress indicator before starting the long request.
+		await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+		let openingResults = false;
+		try {
+			const response = await fetch('{% url "create-analysis" %}', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+				body: JSON.stringify({
+					before_year: beforeYear,
+					after_year: afterYear,
+					location_name: document.getElementById('location-name').value.trim(),
+					location_name_is_manual: locationNameEdited,
+					bounds: {
+						south: selectedBounds.getSouth(),
+						west: selectedBounds.getWest(),
+						north: selectedBounds.getNorth(),
+						east: selectedBounds.getEast()
+					}
+				})
+			});
+			const result = await response.json();
+			if (!response.ok) throw new Error(result.error || 'The analysis request could not be prepared.');
+			try {
+				const completedDurations = [...durations, (performance.now() - startedAt) / 1000].slice(-5);
+				localStorage.setItem(durationStorageKey, JSON.stringify(completedDurations));
+			} catch {
+				// Timing remains available for this run when browser storage is disabled.
+			}
+			openingResults = true;
+			const resultsUrl = result.results_url || '{% url "analysis-results" %}';
+			window.location.assign(resultsUrl);
+		} catch (error) {
+			window.clearInterval(progressTimer);
+			progress.hidden = true;
+			status.className = 'map-status error';
+			status.textContent = error.message;
+		} finally {
+			if (!openingResults) {
+				window.clearInterval(progressTimer);
+				button.disabled = false;
+				loader.hidden = true;
+				buttonLabel.hidden = false;
+				button.removeAttribute('aria-label');
+			}
+		}
+	});
+</script>
+
+{% endblock content %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}ZIMLCD Help{% endblock %}
+{% block breadcrumb %}Help{% endblock %}
+{% block heading %}Using ZIMLCD{% endblock %}
+
+{% block content %}
+<h2>Run a change analysis</h2>
+<ol>
+  <li>Open Change Analysis and draw a rectangle around an area in Zimbabwe.</li>
+  <li>Select an earlier year and a later year.</li>
+  <li>Choose <strong>Prepare analysis</strong> and wait for the imagery and models to finish.</li>
+  <li>Review the local model's snapshot-level land-cover estimates, paired snapshot classes, and change mask on the results page.</li>
+  <li>Use Land Cover Maps to switch between the available image layers, or Reports to review and download the latest summary.</li>
+</ol>
+<h2>Understanding the outputs</h2>
+<p>The local CNN estimates land-cover classes from dated Esri Wayback snapshots. Its training data is separate from these snapshots, so estimates are not independently validated for the selected area. The change U-Net's mask is also a model estimate, not a measured area of verified land-cover change.</p>
+<p>Esri Wayback release dates indicate when a release was published. The underlying image at a particular location may have been captured earlier.</p>
+<p>Results are model estimates and should be compared with local reference data before drawing conclusions.</p>
+<p><a href="{% url 'home' %}">Start a new analysis</a></p>
+{% endblock content %}

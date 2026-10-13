@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}ZIMLCD Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<style>
+  .dash-intro { margin:0 0 16px; color:#5d6a70; }
+  .dash-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr); gap:14px; }
+  .dash-panel { min-width:0; padding:16px; border:1px solid #d0d2cb; background:#faf8f2; box-shadow:0 2px 7px rgba(20,42,52,.04); }
+  .dash-panel h2 { margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid #e1e0d9; color:#173d5e; font-size:17px; }
+  .dash-panel h3 { margin:14px 0 7px; color:#1f3c4b; font-size:16px; }
+  .dash-stat-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; margin:0 0 14px; }
+  .dash-stat { min-width:0; padding:11px 12px; border:1px solid #d0d2cb; border-top:3px solid #7892a0; background:#faf8f2; }
+  .dash-stat:nth-child(3),.dash-stat:nth-child(5) { border-top-color:#a04432; }
+  .dash-label { display:block; color:#5d6a70; font-size:9px; font-weight:bold; letter-spacing:.45px; text-transform:uppercase; }
+  .dash-value { display:block; margin-top:5px; color:#173d5e; font-size:17px; font-weight:600; line-height:1.25; overflow-wrap:anywhere; }
+  .alert-control { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:8px 0; color:#34474f; font-size:12px; }
+  .alert-control select { padding:5px; border:1px solid #8e9ca3; border-radius:0; background:#fff; font:inherit; }
+  .alert-meter { position:relative; height:18px; margin:12px 0 5px; border:1px solid #c2c5bd; background:linear-gradient(90deg,#d8e5d5 0%,#e8e2bf 55%,#d9a89a 100%); }
+  .alert-fill { height:100%; background:#4e6b3c; opacity:.72; }
+  .alert-marker { position:absolute; top:-5px; bottom:-5px; left:20%; border-left:2px solid #263940; }
+  .alert-axis { display:flex; justify-content:space-between; color:#5d6a70; font-size:10px; }
+  .alert-status { margin-top:10px; padding:11px 12px; border:1px solid #c2c5bd; background:#faf8f2; color:#34474f; font-size:12px; }
+  .alert-status.is-high { border-left:4px solid #a04432; background:#f3e5df; color:#6a3027; }
+  .alert-status.is-low { border-left:4px solid #4e6b3c; background:#e9eee3; color:#344b30; }
+  .confidence-chart { margin-top:8px; }
+  .confidence-head,.confidence-row { display:grid; grid-template-columns:minmax(80px,1fr) 3fr 38px; align-items:center; gap:8px; }
+  .confidence-head { margin-bottom:4px; color:#5d6a70; font-size:10px; }
+  .confidence-row { min-height:28px; border-bottom:1px solid #d9d8d0; font-size:11px; }
+  .confidence-name { color:#34474f; }
+  .paired-bars { display:flex; flex-direction:column; gap:2px; }
+  .paired-bars span { display:block; height:6px; min-width:1px; }
+  .bar-before { background:#7892a0; }
+  .bar-after { background:#4e6b3c; }
+  .confidence-values { color:#5d6a70; text-align:right; font-size:10px; }
+  .chart-legend { display:flex; gap:14px; margin-top:7px; color:#5d6a70; font-size:10px; }
+  .chart-legend span::before { display:inline-block; width:9px; height:9px; margin-right:4px; content:''; background:#7892a0; }
+  .chart-legend span:last-child::before { background:#4e6b3c; }
+  .hectare-legend span:last-child::before { background:#a04432; }
+  #dashboard-map { width:100%; height:340px; border:1px solid #8e9ca3; background:#d9d6cb; }
+  .dash-image { display:block; width:min(220px,100%); max-height:145px; margin-top:10px; border:1px solid #aeb5b5; object-fit:cover; }
+  .chart-axis { display:flex; justify-content:space-between; margin-left:88px; color:#5d6a70; font-size:10px; }
+  .area-chart { margin-top:8px; }
+  .area-bar-row { display:grid; grid-template-columns:80px minmax(0,1fr) 44px; align-items:center; gap:8px; min-height:27px; border-bottom:1px solid #d9d8d0; font-size:11px; }
+  .area-bar-label { color:#34474f; }
+  .area-bar-track { height:12px; border:1px solid #c2c5bd; background:#faf8f2; }
+  .area-bar { height:100%; background:#4e6b3c; }
+  .area-bar.is-flagged { background:#a04432; }
+  .area-bar-value { color:#34474f; text-align:right; }
+  .hectare-row { display:grid; grid-template-columns:80px minmax(0,1fr) 100px; align-items:center; gap:8px; min-height:36px; border-bottom:1px solid #d9d8d0; font-size:11px; }
+  .hectare-bars { display:flex; flex-direction:column; gap:2px; }
+  .hectare-bars span { display:block; height:6px; }
+  .area-hectare-bar { background:#7892a0; }
+  .changed-hectare-bar { background:#a04432; }
+  .hectare-values { color:#34474f; text-align:right; white-space:nowrap; }
+  .dash-insights { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:14px; }
+  .saved-table-wrap { overflow-x:auto; margin-top:10px; }
+  .saved-areas { width:100%; min-width:760px; border-collapse:collapse; font-size:11px; }
+  .saved-areas th,.saved-areas td { padding:9px 10px; border-bottom:1px solid #e0e1db; text-align:left; white-space:nowrap; }
+  .saved-areas th { background:#eeece4; color:#34474f; font-size:10px; text-transform:uppercase; letter-spacing:.35px; }
+  .saved-areas tbody tr:hover { background:#f3f2eb; }
+  .saved-actions { display:flex; align-items:center; gap:8px; }
+  .saved-delete { padding:5px 8px; border:1px solid #b57a68; background:#f3e5df; color:#6a3027; font:inherit; font-size:11px; cursor:pointer; }
+  .saved-delete:hover { background:#ead0c7; }
+  .pagination { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-top:12px; }
+  .pagination a { padding:4px 8px; border:1px solid #8e9ca3; background:#d2dfe8; text-decoration:none; }
+  .area-list { margin:8px 0 0; padding:0; list-style:none; }
+  .area-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:6px 12px; padding:8px 0; border-bottom:1px solid #d9d8d0; font-size:11px; }
+  .area-location { color:#5d6a70; }
+  .area-review { padding:3px 6px; border:1px solid #c2c5bd; background:#faf8f2; color:#34474f; white-space:nowrap; }
+  .area-review.is-flagged { border-color:#b57a68; background:#f3e5df; color:#6a3027; }
+  .area-review.is-clear { border-color:#a8b89b; background:#e9eee3; color:#344b30; }
+  .area-empty { color:#5d6a70; font-size:12px; }
+  .screening-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:8px 0 12px; }
+  .screening-summary-item { padding:9px 10px; border:1px solid #d0d2cb; background:#fff; }
+  .screening-summary-label { display:block; color:#5d6a70; font-size:9px; font-weight:bold; letter-spacing:.4px; text-transform:uppercase; }
+  .screening-summary-value { display:block; margin-top:4px; color:#173d5e; font-size:16px; font-weight:bold; }
+  .screening-empty { padding:12px; border-left:3px solid #7892a0; background:#f1f3ef; color:#5d6a70; font-size:12px; }
+  .dash-links { display:flex; flex-wrap:wrap; gap:9px; margin:14px 0; }
+  .dash-links a { display:inline-block; padding:8px 11px; border:1px solid #9aacb5; background:#dce7ed; color:#173d5e; font-size:12px; font-weight:bold; text-decoration:none; }
+  .dash-links a:hover { background:#bfd2df; }
+  .dash-empty { padding:24px; border:1px solid #d0d2cb; background:#faf8f2; }
+  .dash-caveat { margin-top:10px; color:#5d6a70; font-size:11px; }
+  /* Color the data marks while leaving the dashboard surfaces unchanged. */
+  .content-panel .dash-stat:nth-child(1) { border-top-color:#818cf8 !important; }
+  .content-panel .dash-stat:nth-child(2) { border-top-color:#38bdf8 !important; }
+  .content-panel .dash-stat:nth-child(3) { border-top-color:#fb7185 !important; }
+  .content-panel .dash-stat:nth-child(4) { border-top-color:#2dd4bf !important; }
+  .content-panel .dash-stat:nth-child(5) { border-top-color:#fbbf24 !important; }
+  .content-panel .screening-summary-item:nth-child(1) .screening-summary-value { color:#818cf8 !important; }
+  .content-panel .screening-summary-item:nth-child(2) .screening-summary-value { color:#2dd4bf !important; }
+  .content-panel .screening-summary-item:nth-child(3) .screening-summary-value { color:#fb7185 !important; }
+  .content-panel .dash-panel .bar-before,.content-panel .dash-panel .area-hectare-bar { background:#38bdf8 !important; }
+  .content-panel .dash-panel .bar-after { background:#fbbf24 !important; }
+  .content-panel .dash-panel .area-bar { background:#2dd4bf !important; }
+  .content-panel .dash-panel .area-bar.is-flagged,.content-panel .dash-panel .changed-hectare-bar { background:#fb7185 !important; }
+  .content-panel .dash-panel .alert-fill { background:linear-gradient(90deg,#fbbf24,#fb7185) !important; opacity:1; }
+  .content-panel .dash-panel .alert-marker { border-left-color:#f8fafc !important; }
+  .content-panel .dash-panel .alert-status.is-high,.content-panel .dash-panel .area-review.is-flagged { border-left-color:#fb7185 !important; border-color:#fb7185 !important; color:#fb7185 !important; }
+  .content-panel .dash-panel .alert-status.is-low,.content-panel .dash-panel .area-review.is-clear { border-left-color:#2dd4bf !important; border-color:#2dd4bf !important; color:#2dd4bf !important; }
+  .content-panel .dash-panel .chart-legend span::before { background:#38bdf8 !important; }
+  .content-panel .dash-panel .chart-legend span:last-child::before { background:#fbbf24 !important; }
+  .content-panel .dash-panel .hectare-legend span:last-child::before { background:#fb7185 !important; }
+  @media(max-width:960px) { .dash-stat-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media(max-width:850px) { .dash-grid { grid-template-columns:1fr; } #dashboard-map { height:320px; } }
+  @media(max-width:650px) { .dash-insights { grid-template-columns:1fr; } }
+  @media(max-width:520px) { .dash-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .dash-stat:last-child { grid-column:1/-1; } #dashboard-map { height:280px; } }
+</style>
+
+<p class="dash-intro">A summary of recent land-cover screening and the selected area for {{ analysis.location_name|default:'your latest analysis' }}.</p>
+{% if analysis %}
+  <div class="dash-stat-grid">
+    <div class="dash-stat"><span class="dash-label">Comparison period</span><span class="dash-value">{{ analysis.before_year }} to {{ analysis.after_year }}</span></div>
+    <div class="dash-stat"><span class="dash-label">{% if analysis.outputs.dynamic_world_enabled %}Dynamic World dominant-class transition{% else %}CNN class transition{% endif %}</span><span class="dash-value">{% if analysis.outputs.dynamic_world_enabled %}{{ analysis.outputs.dynamic_world_before_dominant_class|default:'No classified pixels' }} &rarr; {{ analysis.outputs.dynamic_world_after_dominant_class|default:'No classified pixels' }}{% else %}{{ analysis.outputs.before_predicted_class }} &rarr; {{ analysis.outputs.after_predicted_class }}{% endif %}</span></div>
+    <div class="dash-stat"><span class="dash-label">{% if analysis.outputs.dynamic_world_enabled %}Dynamic World pixels with class change{% else %}Pixels flagged changed{% endif %}</span><span class="dash-value">{{ analysis.outputs.changed_percentage }}%</span></div>
+    <div class="dash-stat"><span class="dash-label">Selected area</span><span class="dash-value">{{ analysis.area_hectares|floatformat:2 }} ha</span></div>
+    <div class="dash-stat"><span class="dash-label">Estimated changed area</span><span class="dash-value">{{ analysis.changed_hectares|floatformat:2 }} ha</span></div>
+  </div>
+
+  <div class="dash-grid">
+    <section class="dash-panel">
+      <h2>Recent change screening</h2>
+      {% if change_chart %}
+      <div class="screening-summary" aria-label="Recent screening summary">
+        <div class="screening-summary-item"><span class="screening-summary-label">Areas screened</span><span class="screening-summary-value">{{ change_summary.screened_count }}</span></div>
+        <div class="screening-summary-item"><span class="screening-summary-label">Average changed</span><span class="screening-summary-value">{{ change_summary.average_changed }}%</span></div>
+        <div class="screening-summary-item"><span class="screening-summary-label">At least 10% changed</span><span class="screening-summary-value">{{ change_summary.at_or_above_10 }}</span></div>
+      </div>
+      {% if change_summary.most_changed %}<p class="dash-caveat">Highest recent result: <strong>{{ change_summary.most_changed.label }}</strong> at {{ change_summary.most_changed.changed }}% changed pixels.</p>{% endif %}
+      <div class="area-chart" role="img" aria-label="Changed-pixel share for recent analyzed areas">
+        {% for row in change_chart %}<div class="area-bar-row"><span class="area-bar-label">{{ row.label }}</span><span class="area-bar-track"><span class="area-bar" data-share="{{ row.changed }}" style="display:block;width:{{ row.changed }}%;"></span></span><span class="area-bar-value">{{ row.changed }}%</span></div>{% endfor %}
+        <div class="chart-axis"><span>0%</span><span>50%</span><span>100%</span></div>
+      </div>
+      <p class="dash-caveat">Based on the {{ change_summary.screened_count }} most recent saved analyses. A 10% screening mark is a review aid, not a calibrated risk level.</p>
+      {% else %}<div class="screening-empty"><strong>No screening data yet.</strong><br>Run a change analysis to populate recent area comparisons, average changed-pixel share, and review counts.</div>{% endif %}
+    </section>
+
+    <section class="dash-panel">
+      <h2>Area under review</h2>
+      <p>{{ analysis.before_year }} to {{ analysis.after_year }} &middot; {% if analysis.outputs.dynamic_world_enabled %}{{ analysis.outputs.dynamic_world_after_dominant_class|default:'No classified pixels' }} is the dominant Dynamic World class for the later year.{% else %}{{ analysis.outputs.after_predicted_class }} predicted by the local CNN for the later snapshot.{% endif %}</p>
+      <div id="dashboard-map" aria-label="Recently analyzed areas in Zimbabwe"></div>
+      <p class="dash-caveat">Outlines update with the review threshold. Only outlined locations have been analyzed. Draw another rectangle on Change Analysis to screen a new location.</p>
+      <p><a href="{{ analysis_map_url }}" target="_blank" rel="noopener">Open selected centre on OpenStreetMap</a></p>
+      <img class="dash-image" src="{{ analysis.outputs.after_image }}" alt="Later satellite snapshot for the selected area">
+    </section>
+  </div>
+
+  <div class="dash-insights">
+    <section class="dash-panel">
+      <h2>Change screening</h2>
+      <p>{% if analysis.outputs.dynamic_world_enabled %}Dynamic World annual class labels differ for {{ analysis.outputs.changed_percentage }}% of classified pixels.{% else %}The latest change model marked {{ analysis.outputs.changed_percentage }}% of pixels in the selected area as changed.{% endif %}</p>
+      <div class="alert-control">
+        <label for="alert-threshold">Flag for review at</label>
+        <select id="alert-threshold">
+          <option value="5">5% or more</option><option value="10" selected>10% or more</option><option value="20">20% or more</option><option value="30">30% or more</option><option value="50">50% or more</option>
+        </select>
+      </div>
+      <div class="alert-meter" role="img" aria-label="Changed pixel share compared with selected review threshold">
+        <div class="alert-fill" id="change-fill" style="width:{{ analysis.outputs.changed_percentage }}%;"></div>
+        <div class="alert-marker" id="threshold-marker" style="left:10%;"></div>
+      </div>
+      <div class="alert-axis"><span>0%</span><span>50%</span><span>100%</span></div>
+      <p class="alert-status" id="alert-status" data-change="{{ analysis.outputs.changed_percentage }}" aria-live="polite"></p>
+      <p class="dash-caveat">This is a user-set screening threshold, not a calibrated risk level or an automated warning service. {% if analysis.outputs.dynamic_world_enabled %}Dynamic World class-change share is the primary change result; the Wayback CNN mask is supplemental.{% endif %}</p>
+    </section>
+
+    <section class="dash-panel">
+      <h2>Area and estimated change</h2>
+      <p class="dash-caveat">Hectares are estimated from each drawn rectangle and its changed-pixel share.</p>
+      {% if change_chart %}<div class="area-chart" role="img" aria-label="Selected area and estimated change in hectares for recent analyses">
+        {% for row in change_chart %}<div class="hectare-row"><span class="area-bar-label">{{ row.label }}</span><span class="hectare-bars"><span class="area-hectare-bar" style="width:{{ row.area_width }}%;"></span><span class="changed-hectare-bar" style="width:{{ row.changed_width }}%;"></span></span><span class="hectare-values">{{ row.area_hectares|floatformat:1 }} / {{ row.changed_hectares|floatformat:1 }}</span></div>{% endfor %}
+        <div class="chart-legend hectare-legend"><span>Selected area (ha)</span><span>Estimated change (ha)</span></div><div class="chart-axis"><span>0</span><span>{{ maximum_area_hectares|floatformat:0 }} ha</span></div>
+      </div>{% else %}<p class="area-empty">No area estimates are available.</p>{% endif %}
+    </section>
+
+    <section class="dash-panel">
+      <h2>Areas to review</h2>
+      {% if change_chart %}<p class="dash-caveat">Only previously analyzed areas appear here. Other locations are unassessed.</p><ul class="area-list">
+        {% for row in change_chart %}<li class="area-row" data-share="{{ row.changed }}"><span><strong><a href="{% url 'analysis-result-detail' row.analysis_id %}">{{ row.label }}</a></strong> &middot; {{ row.before_year }} to {{ row.after_year }}<br><span class="area-location">{{ row.center }} &middot; {{ row.class_name }}</span></span><span class="area-review">Review status updates with threshold</span></li>{% endfor %}
+      </ul>{% else %}<p class="area-empty">No analyzed areas to review yet.</p>{% endif %}
+    </section>
+
+    <section class="dash-panel">
+      <h2>{% if analysis.outputs.dynamic_world_enabled %}Annual land-cover share{% else %}Unvalidated CNN class scores{% endif %}</h2>
+      {% if class_chart %}<div class="confidence-chart" role="img" aria-label="{% if analysis.outputs.dynamic_world_enabled %}Dynamic World annual land-cover share for earlier and later years{% else %}CNN class scores for earlier and later snapshots{% endif %}">
+        <div class="confidence-head"><span>Class</span><span>Earlier / later {% if analysis.outputs.dynamic_world_enabled %}share{% else %}score{% endif %}</span><span>%</span></div>
+        {% for row in class_chart %}<div class="confidence-row"><span class="confidence-name">{{ row.name }}</span><span class="paired-bars"><span class="bar-before" style="width:{{ row.before }}%;"></span><span class="bar-after" style="width:{{ row.after }}%;"></span></span><span class="confidence-values">{{ row.after|floatformat:1 }}</span></div>{% endfor %}
+        <div class="chart-legend"><span>Earlier snapshot</span><span>Later snapshot</span></div>
+      </div>{% else %}<p>Land-cover composition is unavailable for this saved analysis.</p>{% endif %}
+    </section>
+  </div>
+
+  <div class="dash-links"><a href="{% url 'home' %}">Analyze another area</a><a href="{% url 'analysis-results' %}">View all model outputs</a><a href="{% url 'reports' %}">Open report</a></div>
+
+  <section class="dash-panel">
+    <h2>Saved analyzed areas ({{ analysis_count }})</h2>
+    <p>Saved to this browser session so you can reopen a previous result later.</p>
+    {% if page_obj.object_list %}
+    <div class="saved-table-wrap"><table class="saved-areas">
+      <thead><tr><th>Location</th><th>Analyzed</th><th>Period</th><th>Area</th><th>Changed area</th><th>Changed pixels</th><th>Later class</th><th>Map</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for record in page_obj.object_list %}
+        <tr><td>{{ record.location_name|default:'Unnamed area' }}</td><td>{{ record.created_at|date:'Y-m-d H:i' }}</td><td>{{ record.before_year }}-{{ record.after_year }}</td><td>{{ record.area_hectares|floatformat:2 }} ha</td><td>{{ record.changed_hectares|floatformat:2 }} ha</td><td>{{ record.outputs.changed_percentage }}%</td><td>{% if record.outputs.dynamic_world_enabled %}{{ record.outputs.dynamic_world_after_dominant_class|default:'No classified pixels' }}{% else %}{{ record.outputs.after_predicted_class }}{% endif %}</td><td><a href="{{ record.map_url }}" target="_blank" rel="noopener">Open map</a></td><td><div class="saved-actions"><a href="{% url 'analysis-result-detail' record.analysis_id %}">View</a><form method="post" action="{% url 'delete-analysis' record.analysis_id %}" onsubmit="return confirm('Delete this saved analysis and its generated files? This cannot be undone.');">{% csrf_token %}<button class="saved-delete" type="submit">Delete</button></form></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="pagination" aria-label="Saved area pages">
+      {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+      <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% else %}<p>No saved analyses yet.</p>{% endif %}
+  </section>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const changedShare = Number(document.getElementById('alert-status').dataset.change) || 0;
+    const thresholdSelect = document.getElementById('alert-threshold');
+    const alertStatus = document.getElementById('alert-status');
+    const thresholdMarker = document.getElementById('threshold-marker');
+    function updateScreeningAlert() {
+      const threshold = Number(thresholdSelect.value);
+      thresholdMarker.style.left = `${threshold}%`;
+      const flagged = changedShare >= threshold;
+      alertStatus.className = `alert-status ${flagged ? 'is-high' : 'is-low'}`;
+      alertStatus.textContent = flagged
+        ? `Review recommended: ${changedShare.toFixed(2)}% changed pixels meets or exceeds your ${threshold}% screening threshold.`
+        : `Below your ${threshold}% screening threshold. The model flagged ${changedShare.toFixed(2)}% of pixels.`;
+      document.querySelectorAll('.area-row').forEach((row) => {
+        const review = row.querySelector('.area-review');
+        const areaFlagged = Number(row.dataset.share) >= threshold;
+        review.className = `area-review ${areaFlagged ? 'is-flagged' : 'is-clear'}`;
+        review.textContent = areaFlagged ? 'Review this area' : 'Below threshold';
+      });
+      document.querySelectorAll('.area-bar').forEach((bar) => {
+        bar.classList.toggle('is-flagged', Number(bar.dataset.share) >= threshold);
+      });
+      analyzedLayers.forEach((entry) => entry.layer.setStyle({
+        color: entry.share >= threshold ? '#fb7185' : '#2dd4bf',
+        weight: entry.share >= threshold ? 3 : 2,
+      }));
+    }
+    thresholdSelect.addEventListener('change', updateScreeningAlert);
+
+    const zimbabweDashboardBounds = L.latLngBounds([-22.5,25.2],[-15.5,33.1]);
+    const dashboardMap = L.map('dashboard-map').fitBounds(zimbabweDashboardBounds, { padding:[12,12] });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom:18, maxZoom:22, attribution:'Tiles &copy; Esri'
+    }).addTo(dashboardMap);
+    L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom:19, maxZoom:22, attribution:'Place labels &copy; Esri and contributors'
+    }).addTo(dashboardMap);
+    const analyzedLayers = [];
+    {% for row in change_chart %}
+    const areaBounds{{ forloop.counter }} = L.latLngBounds(
+      [{{ row.bounds.south }}, {{ row.bounds.west }}],
+      [{{ row.bounds.north }}, {{ row.bounds.east }}]
+    );
+    const areaLayer{{ forloop.counter }} = L.rectangle(areaBounds{{ forloop.counter }}, {
+      color:'#2dd4bf', weight:2, fill:false
+    }).addTo(dashboardMap);
+    const areaPopup{{ forloop.counter }} = document.createElement('span');
+    areaPopup{{ forloop.counter }}.textContent = '{{ row.label|escapejs }}: {{ row.changed }}% changed pixels, {{ row.before_year }} to {{ row.after_year }}';
+    areaLayer{{ forloop.counter }}.bindPopup(areaPopup{{ forloop.counter }});
+    const areaCenter{{ forloop.counter }} = L.circleMarker(areaBounds{{ forloop.counter }}.getCenter(), {
+      radius:5, color:'#ffffff', weight:1.5, fillColor:'#fbbf24', fillOpacity:1
+    }).addTo(dashboardMap);
+    areaCenter{{ forloop.counter }}.bindPopup(areaPopup{{ forloop.counter }});
+    analyzedLayers.push({ layer:areaLayer{{ forloop.counter }}, share:{{ row.changed }} });
+    {% endfor %}
+    updateScreeningAlert();
+    window.requestAnimationFrame(() => dashboardMap.invalidateSize());
+  </script>
+{% else %}
+  <section class="dash-panel">
+    <h2>Recent change screening</h2>
+    <div class="screening-empty"><strong>No screening data yet.</strong><br>Run a change analysis to populate comparisons, average changed-pixel share, and review counts here.</div>
+  </section>
+  <div class="dash-empty"><p>No analysis has been run in this session yet.</p><p>Choose a specific area on the map to compare dated imagery. The dashboard will then show its change screening and class confidence graphs.</p><a href="{% url 'home' %}">Open the analysis map</a></div>
+{% endif %}
+{% endblock content %}
